@@ -8,8 +8,4 @@ export default {
     extend: {},
   },
   plugins: [],
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 7ce0325 (初始版)
