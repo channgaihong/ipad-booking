@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
-import { Cloud, Calendar as CalendarIcon, ClipboardList, Settings, LogOut, CheckCircle, XCircle, Info, ShieldAlert, Trash2, Clock, Smartphone, Ban } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { Cloud, Calendar as CalendarIcon, ClipboardList, Settings, LogOut, CheckCircle, XCircle, Info, ShieldAlert, Trash2, Clock, Smartphone } from 'lucide-react';
 
 // ==========================================
 // ⚙️ 全域設定與工具函式
@@ -260,7 +261,16 @@ export default function App() {
         headers: { 'Content-Type': 'text' + slashChar + 'plain;charset=utf-8' },
         body: JSON.stringify({ action: 'adminSave', payload: updatedDB, auth: { username: loggedAdmin, passwordHash: loggedAdminHash } })
       });
-      const result = await response.json();
+      
+      // 確保伺服器回應正確，否則拋出錯誤擋下後續操作
+      if (!response.ok) throw new Error(`伺服器連線異常 (HTTP ${response.status})`);
+      const responseText = await response.text();
+      let result;
+      try {
+          result = JSON.parse(responseText);
+      } catch (e) {
+          throw new Error("伺服器回傳格式不正確，可能發生執行逾時或權限異常。");
+      }
       if (result && result.status === 'error') throw new Error(result.message);
       
       success = true;
@@ -401,7 +411,7 @@ function PrintOverlay({ db, printData, onClose }) {
         {cartsToPrint.map((cart, idx) => {
            const cartBookings = dayBookings.filter(x => x.cartAssignedId == cart.id);
            return (
-              <div key={cart.id} className={`a5-container p-6 bg-white border-2 border-slate-800 rounded-2xl w-full max-w-[210mm] shadow-xl ${idx !== cartsToPrint.length - 1 ? 'page-break-after' : ''}`}>
+              <div key={cart.id} className="a5-container page-break-after p-6 bg-white border-2 border-slate-800 rounded-2xl w-full max-w-[210mm] shadow-xl">
                 <div className="flex justify-between items-end border-b-2 border-slate-400 pb-2 mb-4">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-slate-700 rounded-lg flex items-center justify-center text-white text-2xl">📱</div>
@@ -479,11 +489,11 @@ function SchedulePage({ db }) {
         </div>
         
         <div className="overflow-x-auto custom-scrollbar pb-2">
-          {/* 加入 table-fixed 強制平分寬度 */}
+          {/* 將第一欄的固定寬度拔除，搭配 table-fixed 自動完全平分所有欄位寬度 */}
           <table className="w-full table-fixed text-sm text-center border-collapse min-w-[800px]">
             <thead className="bg-slate-100 text-slate-600">
               <tr>
-                <th className="p-3 border-b text-left w-32 md:w-40">節次 \ 車輛</th>
+                <th className="p-3 border-b font-bold px-2">節次 \ 車輛</th>
                 {db.carts.map(c => <th key={c.id} className="p-3 border-b font-bold px-2">{c.name}</th>)}
               </tr>
             </thead>
@@ -493,8 +503,8 @@ function SchedulePage({ db }) {
               ) : (
                 validSlots.map(slot => (
                   <tr key={slot.id} className="hover:bg-slate-50 border-b last:border-0">
-                    <td className="p-3 font-bold text-left border-r bg-white sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
-                      {slot.name} <span className="text-xs text-slate-400 block font-normal">{slot.timeRange}</span>
+                    <td className="p-3 font-bold text-center border-r bg-white sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                      {slot.name} <span className="text-xs text-slate-400 block font-normal mt-1">{slot.timeRange}</span>
                     </td>
                     {db.carts.map(cart => {
                       const bList = dayBookings.filter(x => x.cartAssignedId == cart.id && x.timeSlot === slot.name);
@@ -710,7 +720,7 @@ function BookingPage({ db, saveDB, showAlert, showConfirm }) {
       await saveDB(updatedDB);
   };
 
-  const myBookings = db.bookings.filter(b => b.teacher.toLowerCase().includes(searchQuery.toLowerCase()) && b.date >= DateUtils.toISODate(DateUtils.today())).sort((a,b) => new Date(b.date) - new Date(a.date));
+  const myBookings = searchQuery.trim() === '' ? [] : db.bookings.filter(b => b.teacher.toLowerCase().includes(searchQuery.toLowerCase()) && b.date >= DateUtils.toISODate(DateUtils.today())).sort((a,b) => new Date(b.date) - new Date(a.date));
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in">
@@ -860,8 +870,10 @@ function BookingPage({ db, saveDB, showAlert, showConfirm }) {
                 <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="🔍 搜尋教師姓名..." className="w-full sm:w-64 px-4 py-2 bg-slate-100 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-400" />
             </div>
             <div className="flex-grow overflow-y-auto custom-scrollbar pr-2 space-y-3 max-h-[600px]">
-                {myBookings.length === 0 ? (
-                    <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200"><Info className="w-8 h-8 mx-auto mb-2 opacity-50" /> 輸入姓名查詢近期紀錄</div>
+                {searchQuery.trim() === '' ? (
+                    <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200"><Info className="w-8 h-8 mx-auto mb-2 opacity-50" /> 請在上方輸入姓名以查詢近期的預約紀錄</div>
+                ) : myBookings.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">無符合的紀錄</div>
                 ) : (
                     myBookings.map(b => (
                         <div key={b.id} className="p-4 border bg-white rounded-2xl shadow-sm flex flex-col sm:flex-row sm:justify-between items-start sm:items-center gap-4 hover:border-sky-200 transition-colors">
@@ -1010,7 +1022,8 @@ function AdminPanel({ db, saveDB, subPage, setSubPage, onLogout, showAlert, show
                   b.ipadNumbers = ipadStr;
               }
               b.status = newStatus;
-              b.observation = editModal.data.observation;
+              b.observation = editModal.data.observation || '否';
+              b.itSupport = editModal.data.itSupport || '否';
               b.pickupMethod = editModal.data.pickupMethod;
           }
       } else {
@@ -1093,6 +1106,22 @@ function AdminPanel({ db, saveDB, subPage, setSubPage, onLogout, showAlert, show
                                     <option value="rejected">已退回</option>
                                     <option value="cancelled">已取消</option>
                                 </select>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">觀課</label>
+                                    <select value={editModal.data.observation || '否'} onChange={e=>setEditModal(p=>({...p, data:{...p.data, observation: e.target.value}}))} className="w-full p-2.5 border rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-sky-400">
+                                        <option value="否">否</option>
+                                        <option value="是">是</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">需 IT 協助</label>
+                                    <select value={editModal.data.itSupport || '否'} onChange={e=>setEditModal(p=>({...p, data:{...p.data, itSupport: e.target.value}}))} className="w-full p-2.5 border rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-sky-400">
+                                        <option value="否">否</option>
+                                        <option value="是">是</option>
+                                    </select>
+                                  </div>
                               </div>
                               <div>
                                 <label className="block text-xs font-bold text-slate-700 mb-1">分配車輛</label>
@@ -1337,7 +1366,10 @@ function AdminAssign({ db, saveDB, showAlert, showConfirm, setPrintData, openEdi
                                 processed.map(b => (
                                     <tr key={b.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
                                         <td className="px-4 py-3 text-slate-600"><b>{b.date}</b><br />{b.timeSlot}</td>
-                                        <td className="px-4 py-3"><b>{b.teacher}</b><br /><span className="text-xs text-slate-500">{b.className} ({b.peopleCount}人)</span></td>
+                                        <td className="px-4 py-3">
+                                            <b>{b.teacher}</b><br /><span className="text-xs text-slate-500">{b.className} ({b.peopleCount}人)</span>
+                                            {b.remarks && <div className="mt-1 text-[10px] text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded inline-block">備註: {b.remarks}</div>}
+                                        </td>
                                         <td className="px-4 py-3">
                                             {b.status === 'assigned' && (<span className="text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-200 text-xs">✅ 已分配</span>)}
                                             {b.status === 'rejected' && (<span className="text-red-500 font-bold bg-red-50 px-2 py-1 rounded border border-red-200 text-xs">❌ 已退回</span>)}
@@ -1403,25 +1435,48 @@ function AdminAssign({ db, saveDB, showAlert, showConfirm, setPrintData, openEdi
 
 function AdminDisplay({ db, saveDB }) {
     const ds = db.displaySettings || { teacher: true, className: true, observation: true, ipadNumbers: true, pickupMethod: false, itSupport: false, remarks: false };
+    const order = db.displayOrder || DEFAULT_DISPLAY_ORDER;
     const [localDs, setLocalDs] = useState(ds);
+    const [localOrder, setLocalOrder] = useState(order);
+    const [draggedIdx, setDraggedIdx] = useState(null);
+
     const handleSave = async () => {
-        const uDb = {...db, displaySettings: localDs};
+        const uDb = {...db, displaySettings: localDs, displayOrder: localOrder};
         await saveDB(uDb, true);
     };
+
+    const handleDrop = (e, dropIndex) => {
+        e.preventDefault();
+        if (draggedIdx === null || draggedIdx === dropIndex) return;
+        const newArr = [...localOrder];
+        const item = newArr.splice(draggedIdx, 1)[0];
+        newArr.splice(dropIndex, 0, item);
+        setLocalOrder(newArr);
+        setDraggedIdx(null);
+    };
+
+    const labelMap = {teacher:'教師姓名', className:'班級名稱', observation:'觀課提醒', ipadNumbers:'iPad編號', pickupMethod:'取機方式', itSupport:'IT協助', remarks:'備註說明'};
+
     return (
         <div className="bg-white p-6 md:p-8 rounded-3xl border shadow-sm animate-fade-in">
             <h3 className="text-2xl font-extrabold mb-6 text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-2"><Settings className="text-sky-600" /> 總覽表顯示項目</h3>
-            <p className="text-sm text-slate-500 mb-6">自訂前台「每日充電車時間表」格子內呈現的資訊：</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm mb-8 bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                {Object.keys(localDs).map(key => {
-                    const labelMap = {teacher:'教師姓名', className:'班級名稱', observation:'觀課提醒', ipadNumbers:'iPad編號', pickupMethod:'取機方式', itSupport:'IT協助', remarks:'備註說明'};
-                    return (
-                        <label key={key} className="flex items-center space-x-3 cursor-pointer bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm hover:border-sky-300 transition-colors font-bold text-slate-700">
-                            <input type="checkbox" checked={localDs[key]} onChange={(e) => setLocalDs({...localDs, [key]: e.target.checked})} className="accent-sky-600 w-4 h-4" /> <span>{labelMap[key]}</span>
+            <p className="text-sm text-slate-500 mb-6">自訂前台「每日充電車時間表」格子內呈現的資訊與順序 <span className="text-sky-600 font-bold">(可拖拉 ☰ 排序)</span>：</p>
+            <ul className="space-y-3 mb-8 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                {localOrder.map((key, idx) => (
+                    <li key={key} 
+                        draggable 
+                        onDragStart={() => setDraggedIdx(idx)} 
+                        onDragOver={e => e.preventDefault()} 
+                        onDrop={e => handleDrop(e, idx)}
+                        className="flex items-center space-x-3 bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm hover:border-sky-300 transition-colors cursor-grab active:cursor-grabbing">
+                        <div className="text-slate-400 text-lg mr-2">☰</div>
+                        <label className="flex items-center space-x-3 cursor-pointer font-bold text-slate-700 w-full">
+                            <input type="checkbox" checked={localDs[key] || false} onChange={(e) => setLocalDs({...localDs, [key]: e.target.checked})} className="accent-sky-600 w-4 h-4" /> 
+                            <span>{labelMap[key]}</span>
                         </label>
-                    );
-                })}
-            </div>
+                    </li>
+                ))}
+            </ul>
             <button onClick={handleSave} className="px-8 py-3.5 bg-slate-900 text-white rounded-xl text-base font-extrabold shadow-lg hover:bg-slate-800 transition-all hover:-translate-y-0.5">儲存顯示設定</button>
         </div>
     );
