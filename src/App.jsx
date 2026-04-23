@@ -1432,7 +1432,7 @@ function AdminAssign({ db, saveDB, showAlert, showConfirm, setPrintData, openEdi
                                             <b>{b.teacher}</b><br /><span className="text-xs text-slate-500">{b.className} ({b.peopleCount}人)</span>
                                             <div className="flex flex-wrap gap-1 mt-1.5">
                                                 {b.observation === '是' && <span className="text-[10px] text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded font-bold">觀課</span>}
-                                                {b.itSupport === '是' && <span className="text-[10px] text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded font-bold">需IT</span>}
+                                                {b.itSupport === '是' && <span className="text-[10px] text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded font-bold">需IT支援</span>}
                                             </div>
                                             {b.remarks && <div className="mt-1 text-[10px] text-sky-700 bg-sky-50 border border-sky-100 px-1.5 py-0.5 rounded inline-block max-w-[150px] truncate" title={b.remarks}>備註: {b.remarks}</div>}
                                         </td>
