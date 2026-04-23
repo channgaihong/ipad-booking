@@ -408,9 +408,9 @@ function PrintOverlay({ db, printData, onClose }) {
             .no-print { display: none !important; }
             /* 針對每一張表強制換頁，並防止容器內部被切斷 */
             .a5-container { 
-                width: 100%; 
+                width: 90%; 
                 max-width: 210mm;
-                min-height: 140mm; 
+                min-height: 148mm; 
                 display: block; 
                 box-sizing: border-box; 
                 box-shadow: none !important; 
