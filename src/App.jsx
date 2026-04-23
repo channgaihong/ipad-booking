@@ -409,8 +409,8 @@ function PrintOverlay({ db, printData, onClose }) {
             /* 針對每一張表強制換頁，並防止容器內部被切斷 */
             .a5-container { 
                 width: 100%; 
-                max-width: 210mm;
-                min-height: 148mm; 
+                max-width: 148mm;
+                min-height: 210mm; 
                 display: block; 
                 box-sizing: border-box; 
                 box-shadow: none !important; 
@@ -511,9 +511,6 @@ function SchedulePage({ db }) {
 
   return (
     <div className="animate-fade-in">
-      <header className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">歡迎使用 iPad 雲端預約系統</h1>
-      </header>
       <div className="bg-white p-5 sm:p-6 rounded-2xl border shadow-sm">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
           <h2 className="text-xl font-bold flex items-center text-slate-800"><CalendarIcon className="w-5 h-5 mr-2 text-sky-600" /> 每日充電車時間表</h2>
