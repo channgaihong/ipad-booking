@@ -417,7 +417,7 @@ function PrintOverlay({ db, printData, onClose }) {
                 margin: 0 auto !important; 
                 border: none !important;
                 page-break-after: auto;
-                page-break-inside: avoid;
+                
             }
         }
       `}} />
