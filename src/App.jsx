@@ -409,13 +409,14 @@ function PrintOverlay({ db, printData, onClose }) {
             /* 針對每一張表強制換頁，並防止容器內部被切斷 */
             .a5-container { 
                 width: 100%; 
-                max-width: 148mm;
-                min-height: 210mm; 
+                max-width: 210mm;
+                min-height: 148mm; 
                 display: block; 
                 box-sizing: border-box; 
                 box-shadow: none !important; 
                 margin: 0 auto !important; 
                 border: none !important;
+                page-break-after: auto;
                 page-break-inside: avoid;
             }
         }
