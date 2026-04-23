@@ -15,7 +15,7 @@ const doubleQuote = quoteChar + quoteChar;
 const API_URL = ["https:", "", "script.google.com", "macros", "s", "AKfycbxOBNY9x0kCAngFmT4E_PcvwTZuDFh4SjJlmVKsqW8BOMDNJGW0btHDkeu-15OirUE", "exec"].join(slashChar);
 
 const dayMap = { 0: '日', 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六' };
-const DEFAULT_DISPLAY_ORDER = ['teacher', 'observation', 'className', 'pickupMethod', 'itSupport', 'ipadNumbers', 'remarks'];
+const DEFAULT_DISPLAY_ORDER = ['observation', 'teacher', 'className', 'pickupMethod', 'itSupport', 'ipadNumbers', 'remarks'];
 
 const DateUtils = {
   today: () => new Date(),
