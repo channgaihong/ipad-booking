@@ -370,14 +370,14 @@ export default function App() {
         )}
       </main>
       
-      {/* 獨立的 React 列印層 */}
+      {/* 獨立的 React 列印層 (全 JSX 架構) */}
       {printData && <PrintOverlay db={db} printData={printData} onClose={() => setPrintData(null)} />}
     </div>
   );
 }
 
 // ==========================================
-// 🖨️ 獨立列印預覽層 (PrintOverlay)
+// 🖨️ 獨立列印預覽層 (PrintOverlay) - 修正多選分頁功能
 // ==========================================
 function PrintOverlay({ db, printData, onClose }) {
   useEffect(() => {
@@ -387,7 +387,7 @@ function PrintOverlay({ db, printData, onClose }) {
       } catch(e) { 
         console.error("列印被瀏覽器阻擋", e); 
       }
-    }, 300);
+    }, 500); // 增加一點延遲確保 DOM 完全生成
     return () => clearTimeout(timer);
   }, []);
 
@@ -398,8 +398,28 @@ function PrintOverlay({ db, printData, onClose }) {
   const validSlots = db.timeSlots.filter(s => !s.applicableDays || s.applicableDays.includes(targetDay));
 
   return (
-    <div className="fixed inset-0 bg-slate-300 z-[999999] overflow-y-auto" id="print-overlay-react">
-      <style dangerouslySetInnerHTML={{ __html: "@media print { @page { size: A5 landscape; margin: 8mm; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; margin: 0; padding: 0; } nav, main, #loading-overlay, #custom-alert, #edit-modal, #ipad-selector-modal { display: none !important; } #print-overlay-react { position: relative !important; width: 100% !important; background: white !important; display: block !important; overflow: visible !important; height: auto !important; } .no-print { display: none !important; } .page-break-after { page-break-after: always; break-after: page; } .a5-container { width: 100%; min-height: 125mm; display: flex; flex-direction: column; box-sizing: border-box; box-shadow: none !important; margin: 0 !important; border: 2px solid #1e293b !important; } }" }} />
+    <div className="fixed inset-0 bg-slate-300 z-[999999] overflow-y-auto print:static print:bg-white print:overflow-visible" id="print-overlay-react">
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+            @page { size: A5 landscape; margin: 8mm; }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; margin: 0; padding: 0; }
+            nav, main, #loading-overlay, #custom-alert, #edit-modal, #ipad-selector-modal { display: none !important; }
+            #print-overlay-react { position: static !important; width: 100% !important; background: white !important; display: block !important; overflow: visible !important; height: auto !important; }
+            .no-print { display: none !important; }
+            /* 針對每一張表強制換頁，並防止容器內部被切斷 */
+            .a5-container { 
+                width: 100%; 
+                max-width: 210mm;
+                min-height: 148mm; 
+                display: block; 
+                box-sizing: border-box; 
+                box-shadow: none !important; 
+                margin: 0 auto !important; 
+                border: none !important;
+                page-break-inside: avoid;
+            }
+        }
+      `}} />
       <div className="no-print bg-slate-800 p-4 sticky top-0 z-50 flex justify-between items-center shadow-lg">
         <h2 className="text-white text-lg font-bold">列印預覽模式</h2>
         <div className="space-x-3">
@@ -407,11 +427,20 @@ function PrintOverlay({ db, printData, onClose }) {
           <button onClick={() => window.print()} className="px-5 py-2 bg-sky-500 text-white rounded-lg font-bold shadow hover:bg-sky-400 transition-colors">🖨️ 確認列印</button>
         </div>
       </div>
-      <div className="p-4 sm:p-8 space-y-8 flex flex-col items-center">
+      
+      {/* 這裡加入 print:block 取代原來的 flex，這是強制 CSS Page Break 有效的關鍵 */}
+      <div className="p-4 sm:p-8 space-y-8 print:space-y-0 print:block flex flex-col items-center">
         {cartsToPrint.map((cart, idx) => {
            const cartBookings = dayBookings.filter(x => x.cartAssignedId == cart.id);
            return (
-              <div key={cart.id} className="a5-container page-break-after p-6 bg-white border-2 border-slate-800 rounded-2xl w-full max-w-[210mm] shadow-xl">
+              <div 
+                  key={cart.id} 
+                  className="a5-container p-6 bg-white border-2 border-slate-800 rounded-2xl shadow-xl w-full max-w-[210mm] print:p-0 print:mb-0"
+                  style={{ 
+                      pageBreakAfter: idx !== cartsToPrint.length - 1 ? 'always' : 'auto',
+                      breakAfter: idx !== cartsToPrint.length - 1 ? 'page' : 'auto'
+                  }}
+              >
                 <div className="flex justify-between items-end border-b-2 border-slate-400 pb-2 mb-4">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-slate-700 rounded-lg flex items-center justify-center text-white text-2xl">📱</div>
@@ -482,6 +511,9 @@ function SchedulePage({ db }) {
 
   return (
     <div className="animate-fade-in">
+      <header className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">歡迎使用 iPad 雲端預約系統</h1>
+      </header>
       <div className="bg-white p-5 sm:p-6 rounded-2xl border shadow-sm">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
           <h2 className="text-xl font-bold flex items-center text-slate-800"><CalendarIcon className="w-5 h-5 mr-2 text-sky-600" /> 每日充電車時間表</h2>
