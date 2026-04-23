@@ -410,14 +410,13 @@ function PrintOverlay({ db, printData, onClose }) {
             .a5-container { 
                 width: 100%; 
                 max-width: 210mm;
-                min-height: 148mm; 
+                min-height: 140mm; 
                 display: block; 
                 box-sizing: border-box; 
                 box-shadow: none !important; 
                 margin: 0 auto !important; 
                 border: none !important;
-                page-break-after: auto;
-                
+                page-break-inside: avoid;
             }
         }
       `}} />
