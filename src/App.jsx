@@ -2,8 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
-import * as XLSX from 'xlsx';
-import CryptoJS from 'crypto-js';
 import { Cloud, Calendar as CalendarIcon, ClipboardList, Settings, LogOut, CheckCircle, XCircle, Info, ShieldAlert, Trash2, Clock, Smartphone, Ban } from 'lucide-react';
 
 // ==========================================
@@ -16,6 +14,7 @@ const doubleQuote = quoteChar + quoteChar;
 const API_URL = ["https:", "", "script.google.com", "macros", "s", "AKfycbxOBNY9x0kCAngFmT4E_PcvwTZuDFh4SjJlmVKsqW8BOMDNJGW0btHDkeu-15OirUE", "exec"].join(slashChar);
 
 const dayMap = { 0: '日', 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六' };
+const DEFAULT_DISPLAY_ORDER = ['teacher', 'observation', 'className', 'pickupMethod', 'itSupport', 'ipadNumbers', 'remarks'];
 
 const DateUtils = {
   today: () => new Date(),
@@ -30,6 +29,7 @@ const DateUtils = {
   }
 };
 
+// 使用原生的 Web Crypto API 進行加密，避免編譯依賴錯誤
 const hashPassword = async (message) => {
   const msgBuffer = new TextEncoder().encode(message);
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
@@ -144,9 +144,13 @@ const defaultDB = {
   timeSlots: [{ id: 1, name: "第一節", timeRange: "08:40 - 09:20", quota: 2, remark: "", showRemark: false, applicableDays: [1, 2, 3, 4, 5, 6, 0] }],
   pickupMethods: [{ id: 1, name: "送到課室" }, { id: 2, name: "送到教員室" }, { id: 3, name: "自取" }],
   displaySettings: { teacher: true, className: true, observation: true, ipadNumbers: true, pickupMethod: false, itSupport: false, remarks: false },
+  displayOrder: DEFAULT_DISPLAY_ORDER,
   holidays: [], bookings: [], bookingCodes: [], admins: [{ username: 'ckadmin', password: 'ckadmin123' }]
 };
 
+// ==========================================
+// ⚛️ 主要 React 應用程式組件
+// ==========================================
 export default function App() {
   const [db, setDb] = useState(defaultDB);
   const [loading, setLoading] = useState(true);
@@ -155,9 +159,12 @@ export default function App() {
   const [loggedAdmin, setLoggedAdmin] = useState(sessionStorage.getItem('loggedAdmin') || null);
   const [loggedAdminHash, setLoggedAdminHash] = useState(sessionStorage.getItem('loggedAdminHash') || null);
   
+  // Alert Modal 狀態
   const [alertConfig, setAlertConfig] = useState({ show: false, msg: '', title: '', icon: 'ℹ️', type: 'alert', onConfirm: null, onCancel: null });
+  // 列印資料狀態
   const [printData, setPrintData] = useState(null);
 
+  // Firebase 狀態
   const [isFirebaseReady, setIsFirebaseReady] = useState(false);
   const [firestoreInstance, setFirestoreInstance] = useState(null);
 
@@ -177,6 +184,7 @@ export default function App() {
     });
   };
 
+  // 初始化資料庫 (Firebase + GAS)
   useEffect(() => {
     const initData = async () => {
       setLoading(true);
@@ -232,8 +240,10 @@ export default function App() {
       }
     };
     initData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 🛡️ 雙備援核心寫入機制
   const saveDB = async (updatedDB, showSuccessMessage = false) => {
     setLoading(true);
     let success = false;
@@ -254,7 +264,7 @@ export default function App() {
       if (result && result.status === 'error') throw new Error(result.message);
       
       success = true;
-      setDb(updatedDB);
+      setDb(updatedDB); // 更新 React State
       if (showSuccessMessage) showAlert("✅ 資料儲存成功並已同步！", "成功", "✅");
     } catch (e) {
       console.error(e);
@@ -293,6 +303,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans relative">
       
+      {/* Loading Overlay */}
       {loading && (
         <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center">
           <div className="w-10 h-10 border-4 border-sky-200 border-t-sky-500 rounded-full animate-spin mb-4"></div>
@@ -300,6 +311,7 @@ export default function App() {
         </div>
       )}
 
+      {/* Alert Modal */}
       {alertConfig.show && (
         <div className="fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white p-8 rounded-3xl w-full max-w-sm shadow-2xl text-center transform transition-all scale-100">
@@ -316,17 +328,23 @@ export default function App() {
         </div>
       )}
 
+      {/* NavBar (Mobile Responsive Updated) */}
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm no-print">
-        <div className="max-w-7xl mx-auto px-4 lg:px-8">
-          <div className="flex justify-between h-16 sm:h-20 items-center">
-            <div className="flex items-center">
-              <Cloud className="w-8 h-8 text-sky-500 mr-2" />
-              <span className="text-xl font-bold text-slate-900">iPad 預約系統</span>
+        <div className="max-w-7xl mx-auto px-4 lg:px-8 py-2 sm:py-0">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:h-20 items-center gap-3 sm:gap-0">
+            <div className="flex items-center justify-between w-full sm:w-auto">
+              <div className="flex items-center">
+                <Cloud className="w-8 h-8 text-sky-500 mr-2" />
+                <span className="text-xl font-bold text-slate-900">iPad 預約系統</span>
+              </div>
+              <button onClick={() => setActivePage('admin')} className={`sm:hidden p-2 rounded-lg transition-colors ${activePage === 'admin' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'}`}>
+                <Settings className="w-5 h-5" />
+              </button>
             </div>
-            <div className="flex space-x-2 sm:space-x-4 overflow-x-auto no-scrollbar items-center">
-              <button onClick={() => setActivePage('schedule')} className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activePage === 'schedule' ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>時間表</button>
-              <button onClick={() => setActivePage('booking')} className={`whitespace-nowrap px-5 py-2 sm:py-2.5 rounded-xl text-sm font-bold shadow-md transition-transform transform hover:-translate-y-0.5 flex items-center gap-2 ${activePage === 'booking' ? 'bg-sky-600 text-white ring-4 ring-sky-200' : 'bg-gradient-to-r from-sky-500 to-blue-600 text-white'}`}><ClipboardList className="w-4 h-4" /> 立即預約</button>
-              <button onClick={() => setActivePage('admin')} className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activePage === 'admin' ? 'bg-slate-900 text-white font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>管理後台</button>
+            <div className="flex w-full sm:w-auto justify-between sm:justify-end space-x-2 sm:space-x-4 items-center">
+              <button onClick={() => setActivePage('schedule')} className={`flex-1 sm:flex-none whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activePage === 'schedule' ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>時間表</button>
+              <button onClick={() => setActivePage('booking')} className={`flex-1 sm:flex-none justify-center whitespace-nowrap px-5 py-2 sm:py-2.5 rounded-xl text-sm font-bold shadow-md transition-transform transform hover:-translate-y-0.5 flex items-center gap-2 ${activePage === 'booking' ? 'bg-sky-600 text-white ring-4 ring-sky-200' : 'bg-gradient-to-r from-sky-500 to-blue-600 text-white'}`}><ClipboardList className="w-4 h-4" /> 立即預約</button>
+              <button onClick={() => setActivePage('admin')} className={`hidden sm:block whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activePage === 'admin' ? 'bg-slate-900 text-white font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>管理後台</button>
             </div>
           </div>
         </div>
@@ -342,11 +360,15 @@ export default function App() {
         )}
       </main>
       
+      {/* 獨立的 React 列印層 */}
       {printData && <PrintOverlay db={db} printData={printData} onClose={() => setPrintData(null)} />}
     </div>
   );
 }
 
+// ==========================================
+// 🖨️ 獨立列印預覽層 (PrintOverlay)
+// ==========================================
 function PrintOverlay({ db, printData, onClose }) {
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -366,8 +388,8 @@ function PrintOverlay({ db, printData, onClose }) {
   const validSlots = db.timeSlots.filter(s => !s.applicableDays || s.applicableDays.includes(targetDay));
 
   return (
-    <div className="fixed inset-0 bg-slate-300 z-[999999] overflow-y-auto">
-      <style dangerouslySetInnerHTML={{ __html: "@media print { @page { size: A5 landscape; margin: 8mm; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; margin: 0; padding: 0; } nav, main, #loading-overlay, #custom-alert { display: none !important; } .no-print { display: none !important; } .page-break-after { page-break-after: always; break-after: page; } .a5-container { width: 100%; min-height: 125mm; display: flex; flex-direction: column; box-sizing: border-box; box-shadow: none !important; margin: 0 !important; border: 2px solid #1e293b !important; } }" }} />
+    <div className="fixed inset-0 bg-slate-300 z-[999999] overflow-y-auto" id="print-overlay-react">
+      <style dangerouslySetInnerHTML={{ __html: "@media print { @page { size: A5 landscape; margin: 8mm; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; margin: 0; padding: 0; } nav, main, #loading-overlay, #custom-alert, #edit-modal, #ipad-selector-modal { display: none !important; } #print-overlay-react { position: relative !important; width: 100% !important; background: white !important; display: block !important; overflow: visible !important; height: auto !important; } .no-print { display: none !important; } .page-break-after { page-break-after: always; break-after: page; } .a5-container { width: 100%; min-height: 125mm; display: flex; flex-direction: column; box-sizing: border-box; box-shadow: none !important; margin: 0 !important; border: 2px solid #1e293b !important; } }" }} />
       <div className="no-print bg-slate-800 p-4 sticky top-0 z-50 flex justify-between items-center shadow-lg">
         <h2 className="text-white text-lg font-bold">列印預覽模式</h2>
         <div className="space-x-3">
@@ -413,7 +435,7 @@ function PrintOverlay({ db, printData, onClose }) {
                           <td className="border border-slate-800">{slot.timeRange || ''}</td>
                           <td className="border border-slate-800 font-bold">
                             {b.teacher}
-                            {b.observation === '是' ? <span className="text-red-600 font-bold"> (觀課)</span> : ""}
+                            {b.observation === '是' && (<span className="text-red-600 font-bold"> (觀課)</span>)}
                           </td>
                           <td className="border border-slate-800">{b.className}</td>
                           <td className="border border-slate-800 font-bold">{b.peopleCount}</td>
@@ -446,6 +468,7 @@ function SchedulePage({ db }) {
   const dayBookings = db.bookings.filter(b => b.date === date && b.status === 'assigned');
   const validSlots = db.timeSlots.filter(s => !s.applicableDays || s.applicableDays.includes(targetDay));
   const ds = db.displaySettings || { teacher: true, className: true };
+  const displayOrder = db.displayOrder || DEFAULT_DISPLAY_ORDER;
 
   return (
     <div className="animate-fade-in">
@@ -456,13 +479,11 @@ function SchedulePage({ db }) {
         </div>
         
         <div className="overflow-x-auto custom-scrollbar pb-2">
-          {/* 在這裡加上了 table-fixed 類別，強制欄位平分寬度；同時放大最小寬度避免擠壓 */}
+          {/* 加入 table-fixed 強制平分寬度 */}
           <table className="w-full table-fixed text-sm text-center border-collapse min-w-[800px]">
             <thead className="bg-slate-100 text-slate-600">
               <tr>
-                {/* 第一欄固定寬度 */}
                 <th className="p-3 border-b text-left w-32 md:w-40">節次 \ 車輛</th>
-                {/* 剩下的標題欄位將會自動且平均地等分剩餘寬度 */}
                 {db.carts.map(c => <th key={c.id} className="p-3 border-b font-bold px-2">{c.name}</th>)}
               </tr>
             </thead>
@@ -472,26 +493,28 @@ function SchedulePage({ db }) {
               ) : (
                 validSlots.map(slot => (
                   <tr key={slot.id} className="hover:bg-slate-50 border-b last:border-0">
-                    {/* 左側固定第一欄內容 */}
                     <td className="p-3 font-bold text-left border-r bg-white sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
                       {slot.name} <span className="text-xs text-slate-400 block font-normal">{slot.timeRange}</span>
                     </td>
-                    {/* 這裡的每一格因為 table-fixed 都會完全等寬 */}
                     {db.carts.map(cart => {
                       const bList = dayBookings.filter(x => x.cartAssignedId == cart.id && x.timeSlot === slot.name);
                       return (
                         <td key={cart.id} className="p-2 border-r last:border-0 align-top">
                           {bList.length > 0 ? bList.map((b, i) => (
-                            <div key={b.id} className={`p-2 rounded-lg text-center mb-2 last:mb-0 shadow-sm border ${['bg-sky-50 border-sky-200 text-sky-900', 'bg-emerald-50 border-emerald-200 text-emerald-900', 'bg-purple-50 border-purple-200 text-purple-900'][i % 3]}`}>
-                              <div className="font-bold flex items-center justify-center flex-wrap gap-1">
-                                {ds.teacher ? b.teacher : ""}
-                                {ds.observation && b.observation === '是' ? <span className="bg-red-500 text-white text-[10px] px-1.5 rounded animate-pulse">觀課</span> : null}
-                              </div>
-                              {ds.className ? <div className="text-xs mt-1">{b.className}</div> : null}
-                              {ds.pickupMethod ? <div className="text-[10px] mt-1 text-slate-600">📦 {b.pickupMethod}</div> : null}
-                              {ds.itSupport && b.itSupport === '是' ? <div className="text-[10px] mt-0.5 text-blue-700 font-bold">💻 需 IT</div> : null}
-                              {ds.ipadNumbers && b.ipadNumbers ? <div className="text-[10px] mt-1.5 bg-white/70 rounded px-1 py-0.5 font-mono truncate" title={b.ipadNumbers}>📱 {b.ipadNumbers}</div> : null}
-                              {ds.remarks && b.remarks ? <div className="text-[10px] mt-1 text-slate-500 italic truncate max-w-[120px] mx-auto" title={b.remarks}>📝 {b.remarks}</div> : null}
+                            <div key={b.id} className={`p-2 rounded-lg text-center mb-2 last:mb-0 shadow-sm border flex flex-col items-center gap-0.5 ${['bg-sky-50 border-sky-200 text-sky-900', 'bg-emerald-50 border-emerald-200 text-emerald-900', 'bg-purple-50 border-purple-200 text-purple-900'][i % 3]}`}>
+                              {displayOrder.map(key => {
+                                  if (!ds[key]) return null;
+                                  switch(key) {
+                                      case 'teacher': return b.teacher ? <div key="teacher" className="font-bold text-sm leading-tight">{b.teacher}</div> : null;
+                                      case 'observation': return b.observation === '是' ? <div key="obs"><span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded animate-pulse">觀課</span></div> : null;
+                                      case 'className': return b.className ? <div key="class" className="text-xs">{b.className}</div> : null;
+                                      case 'pickupMethod': return b.pickupMethod ? <div key="pickup" className="text-[10px] text-slate-600">📦 {b.pickupMethod}</div> : null;
+                                      case 'itSupport': return b.itSupport === '是' ? <div key="it" className="text-[10px] text-blue-700 font-bold">💻 需 IT</div> : null;
+                                      case 'ipadNumbers': return b.ipadNumbers ? <div key="ipad" className="text-[10px] bg-white/70 rounded px-1 py-0.5 font-mono truncate max-w-full" title={b.ipadNumbers}>📱 {b.ipadNumbers}</div> : null;
+                                      case 'remarks': return b.remarks ? <div key="rmk" className="text-[10px] text-slate-500 italic truncate max-w-full" title={b.remarks}>📝 {b.remarks}</div> : null;
+                                      default: return null;
+                                  }
+                              })}
                             </div>
                           )) : <span className="text-slate-300 text-xs">空閒</span>}
                         </td>
@@ -508,6 +531,9 @@ function SchedulePage({ db }) {
   );
 }
 
+// ==========================================
+// 📝 頁面 2：預約登記 (BookingPage)
+// ==========================================
 function BookingPage({ db, saveDB, showAlert, showConfirm }) {
   const [formData, setForm] = useState({ teacher: '', mode: 'single', singleDate: '', batchDates: [], pickup: '送到課室', it: '否', obs: '否', remarks: '', authCode: '', isUrgent: false });
   const [selectedSlots, setSelectedSlots] = useState({});
@@ -584,10 +610,10 @@ function BookingPage({ db, saveDB, showAlert, showConfirm }) {
   const handleAddBatchDate = () => {
     const d = tempBatchDate;
     if (!d) return;
-    if (d > maxDate) return showAlert("超出可預約範圍 (最遠至 " + maxDate + ")");
+    if (d > maxDate) return showAlert(`超出可預約範圍 (最遠至 ${maxDate})`);
     if (d < minAllowedDate) return showAlert("該日期需要開啟緊急預約");
     const hol = checkIsHoliday(d, db);
-    if (hol) return showAlert("停借日: " + hol.remark);
+    if (hol) return showAlert(`停借日: ${hol.remark}`);
     if (!formData.batchDates.includes(d)) {
       setForm(p => ({...p, batchDates: [...p.batchDates, d]}));
       setTempBatchDate('');
@@ -600,7 +626,7 @@ function BookingPage({ db, saveDB, showAlert, showConfirm }) {
     
     if(!startStr || !endStr) return showAlert("請選擇開始與結束日期！", "提示", "⚠️");
     if(startStr > endStr) return showAlert("開始日期不能大於結束日期！", "錯誤", "❌");
-    if (endStr > maxDate) return showAlert("超出可預約範圍 (系統最遠開放至 " + maxDate + ")", "錯誤", "❌");
+    if (endStr > maxDate) return showAlert(`超出可預約範圍 (系統最遠開放至 ${maxDate})`, "錯誤", "❌");
 
     let current = new Date(startStr); 
     const end = new Date(endStr); 
@@ -640,13 +666,13 @@ function BookingPage({ db, saveDB, showAlert, showConfirm }) {
       let newBookings = [];
       for (let slotName of Object.keys(selectedSlots)) {
           const detail = selectedSlots[slotName];
-          if (!detail.people) return showAlert("請輸入 " + slotName + " 的借用人數");
+          if (!detail.people) return showAlert(`請輸入 ${slotName} 的借用人數`);
           const classLimit = db.classes.find(c => c.name === detail.class)?.limit || 30;
-          if (detail.people > classLimit) return showAlert(slotName + " 人數超出班級上限(" + classLimit + ")");
+          if (detail.people > classLimit) return showAlert(`${slotName} 人數超出班級上限(${classLimit})`);
 
           for (let d of dates) {
               if (db.bookings.some(b => b.date === d && b.timeSlot === slotName && b.className === detail.class && b.status !== 'cancelled' && b.status !== 'rejected')) {
-                  return showAlert("日期 " + d + " 的 [" + slotName + "] 班級【" + detail.class + "】已有紀錄，無法重複預約！");
+                  return showAlert(`日期 ${d} 的 [${slotName}] 班級【${detail.class}】已有紀錄，無法重複預約！`);
               }
               newBookings.push({
                   id: Date.now().toString() + Math.floor(Math.random()*1000),
@@ -669,7 +695,7 @@ function BookingPage({ db, saveDB, showAlert, showConfirm }) {
 
       const success = await saveDB(updatedDB);
       if (success) {
-          showAlert("✅ 預約已送出！共建立 " + newBookings.length + " 筆預約。", "成功", "🎉");
+          showAlert(`✅ 預約已送出！共建立 ${newBookings.length} 筆預約。`, "成功", "🎉");
           setForm({ teacher: '', mode: 'single', singleDate: '', batchDates: [], pickup: '送到課室', it: '否', obs: '否', remarks: '', authCode: '', isUrgent: false });
           setSelectedSlots({});
       }
@@ -688,6 +714,7 @@ function BookingPage({ db, saveDB, showAlert, showConfirm }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in">
+        {/* 表單區塊 */}
         <div className="bg-white p-6 md:p-8 rounded-2xl border shadow-lg lg:col-span-5">
             <h2 className="text-2xl font-extrabold mb-6 flex items-center"><ClipboardList className="w-6 h-6 mr-2 text-sky-600" /> 新建預約申請</h2>
             <div className="space-y-5">
@@ -723,7 +750,7 @@ function BookingPage({ db, saveDB, showAlert, showConfirm }) {
                             setForm({...formData, singleDate: dStr});
                             if (dStr) {
                                 const hol = checkIsHoliday(dStr, db);
-                                if (hol) showAlert("⚠️ 停借日: " + hol.remark);
+                                if (hol) showAlert(`⚠️ 停借日: ${hol.remark}`);
                             }
                         }} className="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-sky-400" />
                     ) : (
@@ -763,6 +790,7 @@ function BookingPage({ db, saveDB, showAlert, showConfirm }) {
                     )}
                 </div>
 
+                {/* 動態時段顯示 */}
                 {availableSlots.length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
                         {availableSlots.map(slot => (
@@ -770,7 +798,7 @@ function BookingPage({ db, saveDB, showAlert, showConfirm }) {
                                 <label className="flex items-center cursor-pointer">
                                     <input type="checkbox" checked={slot.isSelected} disabled={slot.isFull && !slot.isSelected} onChange={() => toggleSlot(slot.name)} className="mr-2.5 w-4 h-4 accent-sky-600" />
                                     <span className={`text-sm font-bold ${slot.isFull && !slot.isSelected ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
-                                      {slot.name} <span className="text-[10px] text-slate-500 block sm:inline font-normal mt-0.5 sm:mt-0">({slot.isFull && !slot.isSelected ? '額滿' : ("剩" + slot.remain)})</span>
+                                      {slot.name} <span className="text-[10px] text-slate-500 block sm:inline font-normal mt-0.5 sm:mt-0">({slot.isFull && !slot.isSelected ? '額滿' : `剩${slot.remain}`})</span>
                                     </span>
                                 </label>
                                 {slot.isSelected && (
@@ -825,9 +853,10 @@ function BookingPage({ db, saveDB, showAlert, showConfirm }) {
             </div>
         </div>
 
+        {/* 查詢清單區塊 */}
         <div className="bg-white p-6 md:p-8 rounded-2xl border shadow-sm lg:col-span-7 flex flex-col h-full">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-3">
-                <h3 className="text-xl font-extrabold text-slate-800">⏱️ 近期預約記錄</h3>
+                <h3 className="text-xl font-extrabold text-slate-800">⏱️ 預約記錄查詢</h3>
                 <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="🔍 搜尋教師姓名..." className="w-full sm:w-64 px-4 py-2 bg-slate-100 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-400" />
             </div>
             <div className="flex-grow overflow-y-auto custom-scrollbar pr-2 space-y-3 max-h-[600px]">
@@ -840,18 +869,18 @@ function BookingPage({ db, saveDB, showAlert, showConfirm }) {
                                 <div className="font-extrabold text-slate-800 text-base">
                                   {b.teacher} 
                                   <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full ml-1 font-bold">{b.className}</span> 
-                                  {b.observation === '是' ? <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded ml-1 font-bold">觀課</span> : null}
+                                  {b.observation === '是' && (<span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded ml-1 font-bold">觀課</span>)}
                                 </div>
                                 <div className="text-sm text-slate-500 mt-1 font-medium flex items-center gap-1.5"><CalendarIcon className="w-3.5 h-3.5" /> {b.date} <Clock className="w-3.5 h-3.5 ml-1" /> {b.timeSlot}</div>
-                                {b.remarks ? <div className="text-xs text-sky-600 mt-2 bg-sky-50 px-2 py-1 rounded inline-block">備註: {b.remarks}</div> : null}
+                                {b.remarks && (<div className="text-xs text-sky-600 mt-2 bg-sky-50 px-2 py-1 rounded inline-block">備註: {b.remarks}</div>)}
                             </div>
                             <div className="text-right flex flex-col items-start sm:items-end gap-2 w-full sm:w-auto bg-slate-50 sm:bg-transparent p-3 sm:p-0 rounded-lg">
-                                {b.status === 'assigned' ? <span className="text-emerald-600 font-extrabold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-sm flex items-center gap-1">✅ {b.cartAssignedName} <span className="text-xs font-normal text-emerald-700 block ml-1">{b.ipadNumbers ? ("📱" + b.ipadNumbers) : ""}</span></span> : null}
-                                {b.status === 'rejected' ? <span className="text-red-500 font-bold bg-red-50 px-2 py-1 rounded-lg">❌ 已退回</span> : null}
-                                {b.status === 'cancelled' ? <span className="text-slate-400 font-bold">⛔ 已取消</span> : null}
-                                {b.status === 'pending' ? <span className="text-amber-600 font-bold bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 shadow-sm">⏳ 待處理</span> : null}
+                                {b.status === 'assigned' && (<span className="text-emerald-600 font-extrabold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-sm flex items-center gap-1">✅ {b.cartAssignedName} <span className="text-xs font-normal text-emerald-700 block ml-1">{b.ipadNumbers && (`📱${b.ipadNumbers}`)}</span></span>)}
+                                {b.status === 'rejected' && (<span className="text-red-500 font-bold bg-red-50 px-2 py-1 rounded-lg">❌ 已退回</span>)}
+                                {b.status === 'cancelled' && (<span className="text-slate-400 font-bold">⛔ 已取消</span>)}
+                                {b.status === 'pending' && (<span className="text-amber-600 font-bold bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 shadow-sm">⏳ 待處理</span>)}
                                 
-                                {b.status === 'pending' ? <button onClick={() => cancelBooking(b.id)} className="text-xs px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-lg hover:bg-red-50 font-bold shadow-sm transition-colors w-full sm:w-auto">取消預約</button> : null}
+                                {b.status === 'pending' && (<button onClick={() => cancelBooking(b.id)} className="text-xs px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-lg hover:bg-red-50 font-bold shadow-sm transition-colors w-full sm:w-auto">取消預約</button>)}
                             </div>
                         </div>
                     ))
@@ -929,6 +958,14 @@ function AdminPanel({ db, saveDB, subPage, setSubPage, onLogout, showAlert, show
     document.body.removeChild(link);
   };
 
+  const backupSystem = () => {
+    const dataStr = "data:text" + slashChar + "json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 2));
+    const dlAnchorElem = document.createElement('a');
+    dlAnchorElem.setAttribute("href", dataStr);
+    dlAnchorElem.setAttribute("download", "iPad_System_Backup_" + DateUtils.toISODate(new Date()) + ".json");
+    dlAnchorElem.click();
+  };
+
   const clearData = async () => {
       const ok = await showConfirm("⚠️ 嚴重警告：此操作將永久刪除所有預約紀錄！\n確定要清空嗎？", "清空歷史紀錄", "🚨");
       if (ok) {
@@ -961,7 +998,7 @@ function AdminPanel({ db, saveDB, subPage, setSubPage, onLogout, showAlert, show
                   let usedIpads = getUsedIpads(b.date, b.timeSlot, cid, b.id, uDb);
                   let conflicts = parsedIpads.filter(num => usedIpads.includes(num));
                   if (conflicts.length > 0) {
-                      showAlert("❌ 儲存失敗：編號 (" + conflicts.join(', ') + ") 已被分配！");
+                      showAlert(`❌ 儲存失敗：編號 (${conflicts.join(', ')}) 已被分配！`);
                       return;
                   }
                   b.cartAssignedId = cid;
@@ -1020,6 +1057,7 @@ function AdminPanel({ db, saveDB, subPage, setSubPage, onLogout, showAlert, show
 
             <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1 mt-6 px-2">進階操作</div>
             <button onClick={exportExcel} className="text-left px-4 py-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-sm font-bold shadow-sm hover:bg-emerald-100 transition-colors flex items-center gap-3"><span className="text-lg">📥</span> 匯出 Excel</button>
+            <button onClick={backupSystem} className="text-left px-4 py-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl text-sm font-bold shadow-sm hover:bg-blue-100 transition-colors flex items-center gap-3"><span className="text-lg">💾</span> 系統備份</button>
             <button onClick={clearData} className="text-left px-4 py-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-bold shadow-sm hover:bg-red-100 transition-colors flex items-center gap-3"><span className="text-lg">⚠️</span> 清理歷史紀錄</button>
             
             <button onClick={onLogout} className="text-left px-4 py-3 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold mt-4 hover:bg-slate-200 transition-colors flex justify-center items-center gap-2 border border-slate-200"><LogOut className="w-4 h-4" /> 安全登出</button>
