@@ -753,7 +753,7 @@ function BookingPage({ db, saveDB, showAlert, showConfirm }) {
                                   let newBatch = p.batchDates.filter(d => isUrgent || d >= newMinDate);
                                   return {...p, isUrgent, singleDate: newSingle, batchDates: newBatch};
                                 });
-                            }} className="mr-1.5 accent-red-600 w-3.5 h-3.5" /> 緊急預約
+                            }} className="mr-1.5 accent-red-600 w-3.5 h-3.5" /> 緊急預約碼(只適用今天或明天)
                         </label>
                     </div>
                     {formData.mode === 'single' ? (
