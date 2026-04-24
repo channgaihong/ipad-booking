@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
@@ -138,6 +138,17 @@ const calculateMaxDate = (currentDb) => {
   return DateUtils.toISODate(cur);
 };
 
+// 💡 針對移動裝置鍵盤新增的自動校正函式
+const normalizeAuthCode = (code) => {
+  if (!code) return '';
+  // 1. 將全形字元轉換為半形
+  let normalized = String(code).replace(new RegExp('[\\uFF01-\\uFF5E]', 'g'), function(ch) {
+    return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0);
+  });
+  // 2. 徹底移除所有空白、不可見字元與符號，確保只留下英數字
+  return normalized.replace(new RegExp('[^A-Za-z0-9]', 'g'), '').toUpperCase();
+};
+
 const defaultDB = {
   carts: [{ id: 1, name: "充電車 B", capacity: 30, damaged: "" }],
   classes: [{ id: 1, name: "一年甲班", limit: 30 }],
@@ -159,12 +170,9 @@ export default function App() {
   const [loggedAdmin, setLoggedAdmin] = useState(sessionStorage.getItem('loggedAdmin') || null);
   const [loggedAdminHash, setLoggedAdminHash] = useState(sessionStorage.getItem('loggedAdminHash') || null);
   
-  // Alert Modal 狀態
   const [alertConfig, setAlertConfig] = useState({ show: false, msg: '', title: '', icon: 'ℹ️', type: 'alert', onConfirm: null, onCancel: null });
-  // 列印資料狀態
   const [printData, setPrintData] = useState(null);
 
-  // Firebase 狀態
   const [isFirebaseReady, setIsFirebaseReady] = useState(false);
   const [firestoreInstance, setFirestoreInstance] = useState(null);
 
@@ -184,7 +192,6 @@ export default function App() {
     });
   };
 
-  // 初始化資料庫 (Firebase + GAS)
   useEffect(() => {
     const initData = async () => {
       setLoading(true);
@@ -243,12 +250,10 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 🛡️ 雙備援核心寫入機制：嚴格驗證機制
   const saveDB = async (updatedDB, showSuccessMessage = false) => {
     setLoading(true);
     let success = false;
     try {
-      // 1. Firebase 即時寫入 (供其他在線使用者觀看)
       if (isFirebaseReady && firestoreInstance) {
         const appId = typeof window.__app_id !== 'undefined' ? String(window.__app_id).split(slashChar).join('_') : 'ipad-booking-app';
         const docRef = doc(firestoreInstance, 'artifacts', appId, 'public', 'data', 'ipad_db', 'global_state');
@@ -256,16 +261,13 @@ export default function App() {
         success = true;
       }
       
-      // 2. GAS 冷儲存 (發送請求至 Google Sheet)
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text' + slashChar + 'plain;charset=utf-8' },
         body: JSON.stringify({ action: 'adminSave', payload: updatedDB, auth: { username: loggedAdmin, passwordHash: loggedAdminHash } })
       });
       
-      // 🚨 嚴格驗證：如果 HTTP 狀態碼不是 200~299，直接拋出例外
       if (!response.ok) throw new Error(`伺服器連線異常 (HTTP ${response.status})`);
-      
       const responseText = await response.text();
       let result;
       try {
@@ -274,17 +276,15 @@ export default function App() {
           throw new Error("伺服器回傳格式不正確，可能發生執行逾時或權限異常。");
       }
       
-      // 🚨 嚴格驗證：如果 GAS 回傳自定義的 Error，直接拋出例外
       if (result && result.status === 'error') throw new Error(result.message);
       
-      // 走到這裡代表「完全成功」
       success = true;
-      setDb(updatedDB); // 🌟 只有成功時，才更新本地的 React State
+      setDb(updatedDB);
       if (showSuccessMessage) showAlert("✅ 資料儲存成功並已同步！", "成功", "✅");
     } catch (e) {
       console.error(e);
       showAlert("❌ 資料儲存失敗：" + e.message, "錯誤", "❌");
-      success = false; // 確保發生錯誤時回傳 false
+      success = false; 
     } finally {
       setLoading(false);
     }
@@ -319,7 +319,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans relative">
       
-      {/* Loading Overlay */}
       {loading && (
         <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center">
           <div className="w-10 h-10 border-4 border-sky-200 border-t-sky-500 rounded-full animate-spin mb-4"></div>
@@ -327,7 +326,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Alert Modal */}
       {alertConfig.show && (
         <div className="fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white p-8 rounded-3xl w-full max-w-sm shadow-2xl text-center transform transition-all scale-100">
@@ -344,7 +342,6 @@ export default function App() {
         </div>
       )}
 
-      {/* NavBar (Mobile Responsive Updated) */}
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm no-print">
         <div className="max-w-7xl mx-auto px-4 lg:px-8 py-2 sm:py-0">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:h-20 items-center gap-3 sm:gap-0">
@@ -376,23 +373,15 @@ export default function App() {
         )}
       </main>
       
-      {/* 獨立的原生列印層，搭配嚴格的 A5 css 分頁控制 */}
       {printData && <PrintOverlay db={db} printData={printData} onClose={() => setPrintData(null)} />}
     </div>
   );
 }
 
-// ==========================================
-// 🖨️ 獨立列印預覽層 (PrintOverlay) - 嚴格修復空白頁問題
-// ==========================================
 function PrintOverlay({ db, printData, onClose }) {
   useEffect(() => {
     const timer = setTimeout(() => {
-      try { 
-        window.print(); 
-      } catch(e) { 
-        console.error("列印被瀏覽器阻擋", e); 
-      }
+      try { window.print(); } catch(e) { console.error("列印被瀏覽器阻擋", e); }
     }, 500); 
     return () => clearTimeout(timer);
   }, []);
@@ -407,52 +396,14 @@ function PrintOverlay({ db, printData, onClose }) {
     <div className="fixed inset-0 bg-slate-300 z-[999999] overflow-y-auto print:static print:bg-white print:overflow-visible" id="print-overlay-react">
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
-            @page { 
-                size: A5 landscape; 
-                margin: 0 !important; /* 歸零預設邊距以防超出 */
-            }
-            html, body { 
-                height: auto !important; 
-                overflow: visible !important; 
-                background: white; 
-                margin: 0 !important; 
-                padding: 0 !important; 
-            }
-            nav, main, #loading-overlay, #custom-alert, #edit-modal, #ipad-selector-modal { 
-                display: none !important; 
-            }
-            #root, #root > div { 
-                display: block !important; 
-                position: static !important; 
-            }
-            #print-overlay-react { 
-                position: absolute !important; 
-                left: 0; top: 0; 
-                width: 100% !important; 
-                background: white !important; 
-                display: block !important; 
-                padding: 0 !important; 
-                margin: 0 !important; 
-            }
+            @page { size: A5 landscape; margin: 0 !important; }
+            html, body { height: auto !important; overflow: visible !important; background: white; margin: 0 !important; padding: 0 !important; }
+            nav, main, #loading-overlay, #custom-alert, #edit-modal, #ipad-selector-modal { display: none !important; }
+            #root, #root > div { display: block !important; position: static !important; }
+            #print-overlay-react { position: absolute !important; left: 0; top: 0; width: 100% !important; background: white !important; display: block !important; padding: 0 !important; margin: 0 !important; }
             .no-print { display: none !important; }
-            
-            /* 針對每一張表強制換頁，並限制絕對長寬避免溢出 */
-            .a5-container { 
-                width: 210mm !important; 
-                height: 147mm !important; /* 刻意少於 A5 橫向高度 148mm 防止空白頁 */
-                padding: 8mm !important; /* 使用內部 padding 取代 @page margin */
-                display: block !important; 
-                box-sizing: border-box !important; 
-                box-shadow: none !important; 
-                margin: 0 !important; 
-                border: none !important;
-                page-break-after: always !important;
-                page-break-inside: avoid !important;
-                overflow: hidden !important;
-            }
-            .a5-container:last-child {
-                page-break-after: auto !important;
-            }
+            .a5-container { width: 210mm !important; height: 147mm !important; padding: 8mm !important; display: block !important; box-sizing: border-box !important; box-shadow: none !important; margin: 0 !important; border: none !important; page-break-after: always !important; page-break-inside: avoid !important; overflow: hidden !important; }
+            .a5-container:last-child { page-break-after: auto !important; }
         }
       `}} />
       
@@ -464,15 +415,11 @@ function PrintOverlay({ db, printData, onClose }) {
         </div>
       </div>
       
-      {/* 加上 print:p-0 print:m-0 確保列印模式沒有外層間距 */}
       <div className="p-4 sm:p-8 space-y-8 print:p-0 print:space-y-0 print:block flex flex-col items-center">
-        {cartsToPrint.map((cart) => {
+        {cartsToPrint.map((cart, idx) => {
            const cartBookings = dayBookings.filter(x => x.cartAssignedId == cart.id);
            return (
-              <div 
-                  key={cart.id} 
-                  className="a5-container p-6 bg-white border-2 border-slate-800 rounded-2xl shadow-xl w-full max-w-[210mm] print:max-w-none print:p-0 print:mb-0"
-              >
+              <div key={cart.id} className="a5-container p-6 bg-white border-2 border-slate-800 rounded-2xl shadow-xl w-full max-w-[210mm] print:max-w-none print:p-0 print:mb-0">
                 <div className="flex justify-between items-end border-b-2 border-slate-400 pb-2 mb-4">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-slate-700 rounded-lg flex items-center justify-center text-white text-2xl">📱</div>
@@ -529,9 +476,6 @@ function PrintOverlay({ db, printData, onClose }) {
   );
 }
 
-// ==========================================
-// 📅 頁面 1：每日時間表 (SchedulePage)
-// ==========================================
 function SchedulePage({ db }) {
   const [date, setDate] = useState(DateUtils.toISODate(DateUtils.today()));
   
@@ -550,7 +494,6 @@ function SchedulePage({ db }) {
         </div>
         
         <div className="overflow-x-auto custom-scrollbar pb-2">
-          {/* 加入 table-fixed 強制平分寬度 */}
           <table className="w-full table-fixed text-sm text-center border-collapse min-w-[800px]">
             <thead className="bg-slate-100 text-slate-600">
               <tr>
@@ -580,7 +523,7 @@ function SchedulePage({ db }) {
                                       case 'observation': return b.observation === '是' ? <div key="obs"><span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded animate-pulse">觀課</span></div> : null;
                                       case 'className': return b.className ? <div key="class" className="text-xs">{b.className}</div> : null;
                                       case 'pickupMethod': return b.pickupMethod ? <div key="pickup" className="text-[10px] text-slate-600">📦 {b.pickupMethod}</div> : null;
-                                      case 'itSupport': return b.itSupport === '是' ? <div key="it" className="text-[10px] text-blue-700 font-bold">💻 需IT支援</div> : null;
+                                      case 'itSupport': return b.itSupport === '是' ? <div key="it" className="text-[10px] text-blue-700 font-bold">💻 需 IT支援</div> : null;
                                       case 'ipadNumbers': return b.ipadNumbers ? <div key="ipad" className="text-[10px] bg-white/70 rounded px-1 py-0.5 font-mono truncate max-w-full" title={b.ipadNumbers}>📱 {b.ipadNumbers}</div> : null;
                                       case 'remarks': return b.remarks ? <div key="rmk" className="text-[10px] text-slate-500 italic truncate max-w-full" title={b.remarks}>📝 {b.remarks}</div> : null;
                                       default: return null;
@@ -602,9 +545,6 @@ function SchedulePage({ db }) {
   );
 }
 
-// ==========================================
-// 📝 頁面 2：預約登記 (BookingPage)
-// ==========================================
 function BookingPage({ db, saveDB, showAlert, showConfirm }) {
   const [formData, setForm] = useState({ teacher: '', mode: 'single', singleDate: '', batchDates: [], pickup: '送到課室', it: '否', obs: '否', remarks: '', authCode: '', isUrgent: false });
   const [selectedSlots, setSelectedSlots] = useState({});
@@ -728,8 +668,9 @@ function BookingPage({ db, saveDB, showAlert, showConfirm }) {
 
       let usedCodesPayload = [];
       if (needsAuthCode) {
-          if (!formData.authCode) return showAlert("緊急預約需輸入 6 碼授權碼", "錯誤", "🚨");
-          const codeObj = db.bookingCodes.find(c => c.code === formData.authCode.toUpperCase() && !c.used);
+          const cleanCode = normalizeAuthCode(formData.authCode);
+          if (!cleanCode) return showAlert("緊急預約需輸入 6 碼授權碼", "錯誤", "🚨");
+          const codeObj = db.bookingCodes.find(c => c.code === cleanCode && !c.used);
           if (!codeObj) return showAlert("授權碼無效或已被使用", "錯誤", "❌");
           usedCodesPayload.push({ code: codeObj.code, usedBy: formData.teacher, usedAt: new Date().toISOString() });
       }
@@ -764,7 +705,6 @@ function BookingPage({ db, saveDB, showAlert, showConfirm }) {
           }
       }
 
-      // 🌟 嚴格確保：只有這裡回傳的 success 為 true，代表 Google Sheet 也成功寫入，才會顯示下方的 Alert 並清空表單
       const success = await saveDB(updatedDB);
       if (success) {
           showAlert(`✅ 預約已送出！共建立 ${newBookings.length} 筆預約。`, "成功", "🎉");
@@ -994,6 +934,7 @@ function AdminLogin({ onLogin }) {
 // ==========================================
 function AdminPanel({ db, saveDB, subPage, setSubPage, onLogout, showAlert, showConfirm, setPrintData }) {
   const [editModal, setEditModal] = useState({ show: false, type: null, index: null, data: null });
+  const fileInputRef = useRef(null);
 
   const exportExcel = () => {
     if(!db.bookings || db.bookings.length === 0) return showAlert("沒有預約紀錄可供匯出！");
@@ -1038,6 +979,67 @@ function AdminPanel({ db, saveDB, subPage, setSubPage, onLogout, showAlert, show
     dlAnchorElem.setAttribute("href", dataStr);
     dlAnchorElem.setAttribute("download", "iPad_System_Backup_" + DateUtils.toISODate(new Date()) + ".json");
     dlAnchorElem.click();
+  };
+
+  const handleImportBackup = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const importedData = JSON.parse(e.target.result);
+            if (!importedData.carts || !importedData.bookings) {
+                 throw new Error("無效的備份檔案格式！遺失重要系統結構。");
+            }
+            const ok = await showConfirm("⚠️ 警告：匯入備份將完全覆蓋目前所有的系統與預約資料！\n確定要繼續嗎？", "匯入系統備份", "🚨");
+            if (ok) {
+                await saveDB(importedData, true);
+                showAlert("✅ 備份已成功還原！", "成功", "🎉");
+            }
+        } catch (error) {
+            showAlert(`❌ 匯入失敗：${error.message}`, "錯誤", "❌");
+        }
+        event.target.value = ''; // 清除輸入以便可以重複選取
+    };
+    reader.readAsText(file);
+  };
+
+  const handleRepairSystem = async () => {
+      const ok = await showConfirm("系統修復將會自動執行：\n1. 補齊遺失的系統預設設定\n2. 清除無效、損毀或重複的預約資料\n\n確定要執行修復嗎？", "一鍵修復系統", "🔧");
+      if (!ok) return;
+
+      let repairedDb = { ...db };
+      
+      // 確保陣列結構不為 null/undefined，否則填入預設值
+      repairedDb.carts = Array.isArray(repairedDb.carts) && repairedDb.carts.length > 0 ? repairedDb.carts : defaultDB.carts;
+      repairedDb.classes = Array.isArray(repairedDb.classes) && repairedDb.classes.length > 0 ? repairedDb.classes : defaultDB.classes;
+      repairedDb.timeSlots = Array.isArray(repairedDb.timeSlots) && repairedDb.timeSlots.length > 0 ? repairedDb.timeSlots : defaultDB.timeSlots;
+      repairedDb.pickupMethods = Array.isArray(repairedDb.pickupMethods) && repairedDb.pickupMethods.length > 0 ? repairedDb.pickupMethods : defaultDB.pickupMethods;
+      repairedDb.displaySettings = repairedDb.displaySettings || defaultDB.displaySettings;
+      repairedDb.displayOrder = Array.isArray(repairedDb.displayOrder) && repairedDb.displayOrder.length > 0 ? repairedDb.displayOrder : defaultDB.displayOrder;
+      repairedDb.holidays = Array.isArray(repairedDb.holidays) ? repairedDb.holidays : [];
+      repairedDb.bookingCodes = Array.isArray(repairedDb.bookingCodes) ? repairedDb.bookingCodes : [];
+      repairedDb.admins = Array.isArray(repairedDb.admins) && repairedDb.admins.length > 0 ? repairedDb.admins : defaultDB.admins;
+
+      // 修復 Booking 資料 (過濾掉損壞資料並去重)
+      if (Array.isArray(repairedDb.bookings)) {
+          let validBookings = [];
+          let seenIds = new Set();
+          repairedDb.bookings.forEach(b => {
+              // 只保留有正確 ID、時間、日期的有效紀錄，並剔除重複項目
+              if (b && b.id && b.timeSlot && b.date && !seenIds.has(b.id)) {
+                  seenIds.add(b.id);
+                  if(!b.status) b.status = 'pending'; // 修復遺失狀態
+                  validBookings.push(b);
+              }
+          });
+          repairedDb.bookings = validBookings;
+      } else {
+          repairedDb.bookings = [];
+      }
+
+      await saveDB(repairedDb, true);
+      showAlert("✅ 系統結構與資料修復完成！所有異常參數已自動校正。", "修復成功", "🔧");
   };
 
   const clearData = async () => {
@@ -1132,7 +1134,13 @@ function AdminPanel({ db, saveDB, subPage, setSubPage, onLogout, showAlert, show
 
             <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1 mt-6 px-2">進階操作</div>
             <button onClick={exportExcel} className="text-left px-4 py-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-sm font-bold shadow-sm hover:bg-emerald-100 transition-colors flex items-center gap-3"><span className="text-lg">📥</span> 匯出 Excel</button>
-            <button onClick={backupSystem} className="text-left px-4 py-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl text-sm font-bold shadow-sm hover:bg-blue-100 transition-colors flex items-center gap-3"><span className="text-lg">💾</span> 系統備份</button>
+            <button onClick={backupSystem} className="text-left px-4 py-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl text-sm font-bold shadow-sm hover:bg-blue-100 transition-colors flex items-center gap-3"><span className="text-lg">💾</span> 系統備份導出</button>
+            
+            {/* 隱藏的檔案上傳標籤 */}
+            <input type="file" ref={fileInputRef} onChange={handleImportBackup} accept=".json" className="hidden" />
+            
+            <button onClick={() => fileInputRef.current.click()} className="text-left px-4 py-3 bg-orange-50 border border-orange-200 text-orange-700 rounded-xl text-sm font-bold shadow-sm hover:bg-orange-100 transition-colors flex items-center gap-3"><span className="text-lg">📂</span> 匯入備份還原</button>
+            <button onClick={handleRepairSystem} className="text-left px-4 py-3 bg-purple-50 border border-purple-200 text-purple-700 rounded-xl text-sm font-bold shadow-sm hover:bg-purple-100 transition-colors flex items-center gap-3"><span className="text-lg">🔧</span> 一鍵修復系統</button>
             <button onClick={clearData} className="text-left px-4 py-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-bold shadow-sm hover:bg-red-100 transition-colors flex items-center gap-3"><span className="text-lg">⚠️</span> 清理歷史紀錄</button>
             
             <button onClick={onLogout} className="text-left px-4 py-3 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold mt-4 hover:bg-slate-200 transition-colors flex justify-center items-center gap-2 border border-slate-200"><LogOut className="w-4 h-4" /> 安全登出</button>
@@ -1432,7 +1440,7 @@ function AdminAssign({ db, saveDB, showAlert, showConfirm, setPrintData, openEdi
                                             <b>{b.teacher}</b><br /><span className="text-xs text-slate-500">{b.className} ({b.peopleCount}人)</span>
                                             <div className="flex flex-wrap gap-1 mt-1.5">
                                                 {b.observation === '是' && <span className="text-[10px] text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded font-bold">觀課</span>}
-                                                {b.itSupport === '是' && <span className="text-[10px] text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded font-bold">需IT支援</span>}
+                                                {b.itSupport === '是' && <span className="text-[10px] text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded font-bold">需IT</span>}
                                             </div>
                                             {b.remarks && <div className="mt-1 text-[10px] text-sky-700 bg-sky-50 border border-sky-100 px-1.5 py-0.5 rounded inline-block max-w-[150px] truncate" title={b.remarks}>備註: {b.remarks}</div>}
                                         </td>
