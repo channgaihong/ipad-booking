@@ -12,7 +12,7 @@ const slashChar = String.fromCharCode(47);
 const quoteChar = String.fromCharCode(34);
 const doubleQuote = quoteChar + quoteChar;
 
-const API_URL = ["https:", "", "script.google.com", "macros", "s", "AKfycbxOBNY9x0kCAngFmT4E_PcvwTZuDFh4SjJlmVKsqW8BOMDNJGW0btHDkeu-15OirUE", "exec"].join(slashChar);
+const API_URL = ["https:", "", "script.google.com", "macros", "s", "AKfycbwoEBK86I5vvf6RScyYNxLGOIVz9SbuFLARCQ-LhzsjvthkMrHwx7unVLfA97LeuQw", "exec"].join(slashChar);
 
 const dayMap = { 0: '日', 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六' };
 const DEFAULT_DISPLAY_ORDER = ['observation', 'teacher', 'className', 'pickupMethod', 'itSupport', 'ipadNumbers', 'remarks'];
@@ -138,14 +138,11 @@ const calculateMaxDate = (currentDb) => {
   return DateUtils.toISODate(cur);
 };
 
-// 💡 針對移動裝置鍵盤新增的自動校正函式
 const normalizeAuthCode = (code) => {
   if (!code) return '';
-  // 1. 將全形字元轉換為半形
   let normalized = String(code).replace(new RegExp('[\\uFF01-\\uFF5E]', 'g'), function(ch) {
     return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0);
   });
-  // 2. 徹底移除所有空白、不可見字元與符號，確保只留下英數字
   return normalized.replace(new RegExp('[^A-Za-z0-9]', 'g'), '').toUpperCase();
 };
 
@@ -218,7 +215,9 @@ export default function App() {
               const docRef = doc(fs, 'artifacts', appId, 'public', 'data', 'ipad_db', 'global_state');
               onSnapshot(docRef, (snapshot) => {
                 if (snapshot.exists()) {
-                  setDb(snapshot.data());
+                  const fetchedDb = snapshot.data();
+                  if (!fetchedDb.pickupMethods) fetchedDb.pickupMethods = [{id: 1, name: "送到課室"}, {id: 2, name: "送到教員室"}, {id: 3, name: "自取"}];
+                  setDb(fetchedDb);
                   setLoading(false);
                 } else {
                   setDoc(docRef, defaultDB);
@@ -238,7 +237,10 @@ export default function App() {
         try {
           const res = await fetch(API_URL);
           const data = await res.json();
-          if (data && data.carts) setDb(data);
+          if (data && data.carts) {
+              if (!data.pickupMethods) data.pickupMethods = [{id: 1, name: "送到課室"}, {id: 2, name: "送到教員室"}, {id: 3, name: "自取"}];
+              setDb(data);
+          }
         } catch (e) {
           showAlert("同步失敗！切換為本地預設模式。", "錯誤", "❌");
         } finally { 
@@ -250,45 +252,166 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const saveDB = async (updatedDB, showSuccessMessage = false) => {
-    setLoading(true);
-    let success = false;
-    try {
-      if (isFirebaseReady && firestoreInstance) {
-        const appId = typeof window.__app_id !== 'undefined' ? String(window.__app_id).split(slashChar).join('_') : 'ipad-booking-app';
-        const docRef = doc(firestoreInstance, 'artifacts', appId, 'public', 'data', 'ipad_db', 'global_state');
-        await setDoc(docRef, updatedDB);
-        success = true;
-      }
-      
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text' + slashChar + 'plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'adminSave', payload: updatedDB, auth: { username: loggedAdmin, passwordHash: loggedAdminHash } })
-      });
-      
-      if (!response.ok) throw new Error(`伺服器連線異常 (HTTP ${response.status})`);
-      const responseText = await response.text();
-      let result;
+  // ==========================================
+  // 🛡️ API 寫入通道 (防止 Race Condition)
+  // ==========================================
+  const api = {
+    // 1. 一般老師新增預約
+    addBookings: async (newBookings, usedCodesPayload) => {
+      setLoading(true);
       try {
-          result = JSON.parse(responseText);
+        const updatedDB = { ...db };
+        updatedDB.bookings = [...(db.bookings || []), ...newBookings];
+        if (usedCodesPayload && usedCodesPayload.length > 0) {
+            usedCodesPayload.forEach(uc => {
+                const cIndex = updatedDB.bookingCodes.findIndex(c => c.code === uc.code);
+                if (cIndex > -1) {
+                    updatedDB.bookingCodes[cIndex].used = true;
+                    updatedDB.bookingCodes[cIndex].usedBy = uc.usedBy;
+                }
+            });
+        }
+        
+        if (isFirebaseReady && firestoreInstance) {
+          const appId = typeof window.__app_id !== 'undefined' ? String(window.__app_id).split(slashChar).join('_') : 'ipad-booking-app';
+          await setDoc(doc(firestoreInstance, 'artifacts', appId, 'public', 'data', 'ipad_db', 'global_state'), updatedDB);
+        }
+        
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text' + slashChar + 'plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'addBookings', payload: newBookings, usedCodes: usedCodesPayload })
+        });
+        
+        if (!response.ok) throw new Error(`伺服器連線異常 (HTTP ${response.status})`);
+        const resJson = await response.json();
+        if (resJson.status === 'error') throw new Error(resJson.message);
+        
+        setDb(updatedDB); 
+        return true;
       } catch (e) {
-          throw new Error("伺服器回傳格式不正確，可能發生執行逾時或權限異常。");
-      }
-      
-      if (result && result.status === 'error') throw new Error(result.message);
-      
-      success = true;
-      setDb(updatedDB);
-      if (showSuccessMessage) showAlert("✅ 資料儲存成功並已同步！", "成功", "✅");
-    } catch (e) {
-      console.error(e);
-      showAlert("❌ 資料儲存失敗：" + e.message, "錯誤", "❌");
-      success = false; 
-    } finally {
-      setLoading(false);
+        console.error(e);
+        throw e;
+      } finally { setLoading(false); }
+    },
+
+    // 2. 取消預約 (單筆更新)
+    cancelBooking: async (bookingId) => {
+      setLoading(true);
+      try {
+        const updatedDB = { ...db };
+        const bIndex = updatedDB.bookings.findIndex(x => x.id === bookingId);
+        if (bIndex > -1) updatedDB.bookings[bIndex].status = 'cancelled';
+        
+        if (isFirebaseReady && firestoreInstance) {
+          const appId = typeof window.__app_id !== 'undefined' ? String(window.__app_id).split(slashChar).join('_') : 'ipad-booking-app';
+          await setDoc(doc(firestoreInstance, 'artifacts', appId, 'public', 'data', 'ipad_db', 'global_state'), updatedDB);
+        }
+        
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text' + slashChar + 'plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'cancelBooking', bookingId: bookingId })
+        });
+        
+        if (!response.ok) throw new Error(`伺服器連線異常 (HTTP ${response.status})`);
+        const resJson = await response.json();
+        if (resJson.status === 'error') throw new Error(resJson.message);
+        
+        setDb(updatedDB);
+        return true;
+      } catch (e) {
+        console.error(e);
+        throw e;
+      } finally { setLoading(false); }
+    },
+
+    // 3. 管理員儲存系統設定 (不更動預約紀錄)
+    adminSaveSettings: async (newDbConfig) => {
+      setLoading(true);
+      try {
+        if (isFirebaseReady && firestoreInstance) {
+          const appId = typeof window.__app_id !== 'undefined' ? String(window.__app_id).split(slashChar).join('_') : 'ipad-booking-app';
+          await setDoc(doc(firestoreInstance, 'artifacts', appId, 'public', 'data', 'ipad_db', 'global_state'), newDbConfig);
+        }
+        
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text' + slashChar + 'plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'adminSaveSettings', payload: newDbConfig, auth: { username: loggedAdmin, passwordHash: loggedAdminHash } })
+        });
+        
+        if (!response.ok) throw new Error(`伺服器連線異常 (HTTP ${response.status})`);
+        const resJson = await response.json();
+        if (resJson.status === 'error') throw new Error(resJson.message);
+        
+        setDb(newDbConfig);
+        return true;
+      } catch (e) {
+        console.error(e);
+        throw e;
+      } finally { setLoading(false); }
+    },
+
+    // 4. 管理員更新/核准多筆預約狀態 (防覆寫)
+    adminUpdateBookings: async (updatedBookingsArray) => {
+      setLoading(true);
+      try {
+        const newDb = { ...db };
+        updatedBookingsArray.forEach(ub => {
+           const idx = newDb.bookings.findIndex(x => x.id === ub.id);
+           if (idx > -1) newDb.bookings[idx] = ub;
+        });
+        
+        if (isFirebaseReady && firestoreInstance) {
+          const appId = typeof window.__app_id !== 'undefined' ? String(window.__app_id).split(slashChar).join('_') : 'ipad-booking-app';
+          await setDoc(doc(firestoreInstance, 'artifacts', appId, 'public', 'data', 'ipad_db', 'global_state'), newDb);
+        }
+        
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text' + slashChar + 'plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'adminUpdateBookings', payload: updatedBookingsArray, auth: { username: loggedAdmin, passwordHash: loggedAdminHash } })
+        });
+        
+        if (!response.ok) throw new Error(`伺服器連線異常 (HTTP ${response.status})`);
+        const resJson = await response.json();
+        if (resJson.status === 'error') throw new Error(resJson.message);
+        
+        setDb(newDb);
+        return true;
+      } catch (e) {
+        console.error(e);
+        throw e;
+      } finally { setLoading(false); }
+    },
+
+    // 5. 強制全域覆寫 (清空資料或還原備份使用)
+    adminOverwriteAll: async (newDbConfig) => {
+      setLoading(true);
+      try {
+        if (isFirebaseReady && firestoreInstance) {
+          const appId = typeof window.__app_id !== 'undefined' ? String(window.__app_id).split(slashChar).join('_') : 'ipad-booking-app';
+          await setDoc(doc(firestoreInstance, 'artifacts', appId, 'public', 'data', 'ipad_db', 'global_state'), newDbConfig);
+        }
+        
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text' + slashChar + 'plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'overwriteAll', payload: newDbConfig, auth: { username: loggedAdmin, passwordHash: loggedAdminHash } })
+        });
+        
+        if (!response.ok) throw new Error(`伺服器連線異常 (HTTP ${response.status})`);
+        const resJson = await response.json();
+        if (resJson.status === 'error') throw new Error(resJson.message);
+        
+        setDb(newDbConfig);
+        return true;
+      } catch (e) {
+        console.error(e);
+        throw e;
+      } finally { setLoading(false); }
     }
-    return success;
   };
 
   const handleAdminLogin = async (u, p) => {
@@ -319,6 +442,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans relative">
       
+      {/* Loading Overlay */}
       {loading && (
         <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center">
           <div className="w-10 h-10 border-4 border-sky-200 border-t-sky-500 rounded-full animate-spin mb-4"></div>
@@ -326,6 +450,7 @@ export default function App() {
         </div>
       )}
 
+      {/* Alert Modal */}
       {alertConfig.show && (
         <div className="fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white p-8 rounded-3xl w-full max-w-sm shadow-2xl text-center transform transition-all scale-100">
@@ -342,6 +467,7 @@ export default function App() {
         </div>
       )}
 
+      {/* NavBar */}
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm no-print">
         <div className="max-w-7xl mx-auto px-4 lg:px-8 py-2 sm:py-0">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:h-20 items-center gap-3 sm:gap-0">
@@ -365,19 +491,23 @@ export default function App() {
 
       <main className="max-w-7xl mx-auto p-4 md:p-8 no-print">
         {activePage === 'schedule' && <SchedulePage db={db} />}
-        {activePage === 'booking' && <BookingPage db={db} saveDB={saveDB} showAlert={showAlert} showConfirm={showConfirm} />}
+        {activePage === 'booking' && <BookingPage db={db} api={api} showAlert={showAlert} showConfirm={showConfirm} />}
         {activePage === 'admin' && (
           loggedAdmin ? 
-            <AdminPanel db={db} saveDB={saveDB} subPage={adminSubPage} setSubPage={setAdminSubPage} onLogout={() => {setLoggedAdmin(null); setLoggedAdminHash(null); sessionStorage.clear();}} showAlert={showAlert} showConfirm={showConfirm} setPrintData={setPrintData} /> : 
+            <AdminPanel db={db} api={api} subPage={adminSubPage} setSubPage={setAdminSubPage} onLogout={() => {setLoggedAdmin(null); setLoggedAdminHash(null); sessionStorage.clear();}} showAlert={showAlert} showConfirm={showConfirm} setPrintData={setPrintData} /> : 
             <AdminLogin onLogin={handleAdminLogin} />
         )}
       </main>
       
+      {/* 獨立的列印預覽層 */}
       {printData && <PrintOverlay db={db} printData={printData} onClose={() => setPrintData(null)} />}
     </div>
   );
 }
 
+// ==========================================
+// 🖨️ 獨立列印預覽層 (PrintOverlay) - A5 精準無白頁限制
+// ==========================================
 function PrintOverlay({ db, printData, onClose }) {
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -396,14 +526,53 @@ function PrintOverlay({ db, printData, onClose }) {
     <div className="fixed inset-0 bg-slate-300 z-[999999] overflow-y-auto print:static print:bg-white print:overflow-visible" id="print-overlay-react">
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
-            @page { size: A5 landscape; margin: 0 !important; }
-            html, body { height: auto !important; overflow: visible !important; background: white; margin: 0 !important; padding: 0 !important; }
-            nav, main, #loading-overlay, #custom-alert, #edit-modal, #ipad-selector-modal { display: none !important; }
-            #root, #root > div { display: block !important; position: static !important; }
-            #print-overlay-react { position: absolute !important; left: 0; top: 0; width: 100% !important; background: white !important; display: block !important; padding: 0 !important; margin: 0 !important; }
+            @page { 
+                size: A5 landscape; 
+                margin: 0 !important; 
+            }
+            html, body { 
+                height: auto !important; 
+                width: 210mm !important;
+                overflow: visible !important; 
+                background: white; 
+                margin: 0 !important; 
+                padding: 0 !important; 
+            }
+            nav, main, #loading-overlay, #custom-alert, #edit-modal, #ipad-selector-modal { 
+                display: none !important; 
+            }
+            #root, #root > div { 
+                display: block !important; 
+                position: static !important; 
+            }
+            #print-overlay-react { 
+                position: absolute !important; 
+                left: 0; top: 0; 
+                width: 100% !important; 
+                background: white !important; 
+                display: block !important; 
+                padding: 0 !important; 
+                margin: 0 !important; 
+            }
             .no-print { display: none !important; }
-            .a5-container { width: 210mm !important; height: 147mm !important; padding: 8mm !important; display: block !important; box-sizing: border-box !important; box-shadow: none !important; margin: 0 !important; border: none !important; page-break-after: always !important; page-break-inside: avoid !important; overflow: hidden !important; }
-            .a5-container:last-child { page-break-after: auto !important; }
+            
+            /* 針對每一張表強制換頁，並限制絕對長寬 210mm x 147.5mm 避免溢出 */
+            .a5-container { 
+                width: 210mm !important; 
+                height: 147.5mm !important; 
+                padding: 5mm !important; 
+                display: block !important; 
+                box-sizing: border-box !important; 
+                box-shadow: none !important; 
+                margin: 0 auto !important; 
+                border: none !important;
+                page-break-after: always !important;
+                page-break-inside: avoid !important;
+                overflow: hidden !important;
+            }
+            .a5-container:last-child {
+                page-break-after: auto !important;
+            }
         }
       `}} />
       
@@ -415,32 +584,37 @@ function PrintOverlay({ db, printData, onClose }) {
         </div>
       </div>
       
+      {/* 加上 print:p-0 print:m-0 確保列印模式沒有外層間距 */}
       <div className="p-4 sm:p-8 space-y-8 print:p-0 print:space-y-0 print:block flex flex-col items-center">
-        {cartsToPrint.map((cart, idx) => {
+        {cartsToPrint.map((cart) => {
            const cartBookings = dayBookings.filter(x => x.cartAssignedId == cart.id);
            return (
-              <div key={cart.id} className="a5-container p-6 bg-white border-2 border-slate-800 rounded-2xl shadow-xl w-full max-w-[210mm] print:max-w-none print:p-0 print:mb-0">
-                <div className="flex justify-between items-end border-b-2 border-slate-400 pb-2 mb-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-slate-700 rounded-lg flex items-center justify-center text-white text-2xl">📱</div>
+              <div 
+                  key={cart.id} 
+                  className="a5-container p-6 bg-white border-2 border-slate-800 rounded-2xl shadow-xl w-full max-w-[210mm] print:max-w-none print:p-0 print:mb-0 print:rounded-none print:shadow-none"
+              >
+                <div className="flex justify-between items-end border-b border-slate-400 pb-1 mb-2">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center text-white text-lg">📱</div>
                     <div>
-                      <h2 className="text-2xl font-bold">{cart.name}</h2>
-                      <p className="text-sm text-slate-600">{DateUtils.toChineseDate(date)}</p>
+                      <h2 className="text-xl font-bold">{cart.name}</h2>
+                      <p className="text-xs text-slate-600">{DateUtils.toChineseDate(date)}</p>
                     </div>
                   </div>
-                  <div className="text-right"><p className="text-lg font-bold text-slate-700">iPad 借用登記表</p></div>
+                  <div className="text-right"><p className="text-base font-bold text-slate-700">iPad 借用登記表</p></div>
                 </div>
-                <table className="w-full border-collapse border border-slate-800 text-xs text-center">
+                {/* 內部表格字體縮小以防撐破版面 */}
+                <table className="w-full border-collapse border border-slate-800 text-[10px] sm:text-xs text-center">
                   <thead>
                     <tr className="bg-slate-100">
-                      <th className="border border-slate-800 p-2 w-[8%]">節次</th>
-                      <th className="border border-slate-800 p-2 w-[14%]">時間</th>
-                      <th className="border border-slate-800 p-2 w-[10%]">教師</th>
-                      <th className="border border-slate-800 p-2 w-[10%]">班級</th>
-                      <th className="border border-slate-800 p-2 w-[6%]">數量</th>
-                      <th className="border border-slate-800 p-2 w-[12%]">取機</th>
-                      <th className="border border-slate-800 p-2 w-[16%]">iPad 編號</th>
-                      <th className="border border-slate-800 p-2">備註</th>
+                      <th className="border border-slate-800 p-1.5 w-[8%]">節次</th>
+                      <th className="border border-slate-800 p-1.5 w-[14%]">時間</th>
+                      <th className="border border-slate-800 p-1.5 w-[10%]">教師</th>
+                      <th className="border border-slate-800 p-1.5 w-[10%]">班級</th>
+                      <th className="border border-slate-800 p-1.5 w-[6%]">數量</th>
+                      <th className="border border-slate-800 p-1.5 w-[12%]">取機</th>
+                      <th className="border border-slate-800 p-1.5 w-[16%]">iPad 編號</th>
+                      <th className="border border-slate-800 p-1.5">備註</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -448,23 +622,23 @@ function PrintOverlay({ db, printData, onClose }) {
                       const bList = cartBookings.filter(x => x.timeSlot === slot.name);
                       if (bList.length === 0) return null;
                       return bList.map(b => (
-                        <tr key={b.id} className="h-10">
+                        <tr key={b.id} className="h-8">
                           <td className="border border-slate-800 font-bold">{slot.name}</td>
                           <td className="border border-slate-800">{slot.timeRange || ''}</td>
                           <td className="border border-slate-800 font-bold">
                             {b.teacher}
-                            {b.observation === '是' && (<span className="text-red-600 font-bold"> (觀課)</span>)}
+                            {b.observation === '是' && (<span className="text-red-600 font-bold ml-1">(觀課)</span>)}
                           </td>
                           <td className="border border-slate-800">{b.className}</td>
                           <td className="border border-slate-800 font-bold">{b.peopleCount}</td>
                           <td className="border border-slate-800">{b.pickupMethod || ''}</td>
-                          <td className="border border-slate-800 text-[10px] break-words max-w-[150px] p-1 leading-tight">{b.ipadNumbers || ''}</td>
-                          <td className="border border-slate-800 text-left px-1 text-[10px]">{b.remarks || ''}</td>
+                          <td className="border border-slate-800 text-[9px] break-words max-w-[150px] p-0.5 leading-tight">{b.ipadNumbers || ''}</td>
+                          <td className="border border-slate-800 text-left px-1 text-[9px] truncate max-w-[100px]">{b.remarks || ''}</td>
                         </tr>
                       ));
                     })}
                     {cartBookings.length === 0 && (
-                      <tr><td colSpan="8" className="border border-slate-800 p-4 text-center text-slate-500 font-bold">本日該車無分配紀錄</td></tr>
+                      <tr><td colSpan="8" className="border border-slate-800 p-3 text-center text-slate-500 font-bold">本日該車無分配紀錄</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -476,6 +650,9 @@ function PrintOverlay({ db, printData, onClose }) {
   );
 }
 
+// ==========================================
+// 📅 頁面 1：每日時間表 (SchedulePage)
+// ==========================================
 function SchedulePage({ db }) {
   const [date, setDate] = useState(DateUtils.toISODate(DateUtils.today()));
   
@@ -494,6 +671,7 @@ function SchedulePage({ db }) {
         </div>
         
         <div className="overflow-x-auto custom-scrollbar pb-2">
+          {/* 加入 table-fixed 強制平分寬度 */}
           <table className="w-full table-fixed text-sm text-center border-collapse min-w-[800px]">
             <thead className="bg-slate-100 text-slate-600">
               <tr>
@@ -523,7 +701,7 @@ function SchedulePage({ db }) {
                                       case 'observation': return b.observation === '是' ? <div key="obs"><span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded animate-pulse">觀課</span></div> : null;
                                       case 'className': return b.className ? <div key="class" className="text-xs">{b.className}</div> : null;
                                       case 'pickupMethod': return b.pickupMethod ? <div key="pickup" className="text-[10px] text-slate-600">📦 {b.pickupMethod}</div> : null;
-                                      case 'itSupport': return b.itSupport === '是' ? <div key="it" className="text-[10px] text-blue-700 font-bold">💻 需 IT支援</div> : null;
+                                      case 'itSupport': return b.itSupport === '是' ? <div key="it" className="text-[10px] text-blue-700 font-bold">💻 需 IT協助</div> : null;
                                       case 'ipadNumbers': return b.ipadNumbers ? <div key="ipad" className="text-[10px] bg-white/70 rounded px-1 py-0.5 font-mono truncate max-w-full" title={b.ipadNumbers}>📱 {b.ipadNumbers}</div> : null;
                                       case 'remarks': return b.remarks ? <div key="rmk" className="text-[10px] text-slate-500 italic truncate max-w-full" title={b.remarks}>📝 {b.remarks}</div> : null;
                                       default: return null;
@@ -545,7 +723,10 @@ function SchedulePage({ db }) {
   );
 }
 
-function BookingPage({ db, saveDB, showAlert, showConfirm }) {
+// ==========================================
+// 📝 頁面 2：預約登記 (BookingPage)
+// ==========================================
+function BookingPage({ db, api, showAlert, showConfirm }) {
   const [formData, setForm] = useState({ teacher: '', mode: 'single', singleDate: '', batchDates: [], pickup: '送到課室', it: '否', obs: '否', remarks: '', authCode: '', isUrgent: false });
   const [selectedSlots, setSelectedSlots] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
@@ -695,31 +876,25 @@ function BookingPage({ db, saveDB, showAlert, showConfirm }) {
           }
       }
 
-      const updatedDB = { ...db };
-      updatedDB.bookings = [...db.bookings, ...newBookings];
-      if (usedCodesPayload.length > 0) {
-          const cIndex = updatedDB.bookingCodes.findIndex(c => c.code === usedCodesPayload[0].code);
-          if (cIndex > -1) {
-              updatedDB.bookingCodes[cIndex].used = true;
-              updatedDB.bookingCodes[cIndex].usedBy = formData.teacher;
-          }
-      }
-
-      const success = await saveDB(updatedDB);
-      if (success) {
+      try {
+          // 使用獨立的 API 通道，確保不覆寫別人的資料
+          await api.addBookings(newBookings, usedCodesPayload);
           showAlert(`✅ 預約已送出！共建立 ${newBookings.length} 筆預約。`, "成功", "🎉");
           setForm({ teacher: '', mode: 'single', singleDate: '', batchDates: [], pickup: '送到課室', it: '否', obs: '否', remarks: '', authCode: '', isUrgent: false });
           setSelectedSlots({});
+      } catch (e) {
+          showAlert("❌ 預約失敗：" + e.message, "錯誤", "❌");
       }
   };
 
   const cancelBooking = async (id) => {
       const ok = await showConfirm("確定要取消這筆預約嗎？名額將重新釋放。");
       if (!ok) return;
-      const updatedDB = { ...db };
-      const b = updatedDB.bookings.find(x => x.id === id);
-      if (b) b.status = 'cancelled';
-      await saveDB(updatedDB);
+      try {
+          await api.cancelBooking(id);
+      } catch (e) {
+          showAlert("❌ 取消失敗：" + e.message, "錯誤", "❌");
+      }
   };
 
   const myBookings = searchQuery.trim() === '' ? [] : db.bookings.filter(b => b.teacher.toLowerCase().includes(searchQuery.toLowerCase()) && b.date >= DateUtils.toISODate(DateUtils.today())).sort((a,b) => new Date(b.date) - new Date(a.date));
@@ -753,7 +928,7 @@ function BookingPage({ db, saveDB, showAlert, showConfirm }) {
                                   let newBatch = p.batchDates.filter(d => isUrgent || d >= newMinDate);
                                   return {...p, isUrgent, singleDate: newSingle, batchDates: newBatch};
                                 });
-                            }} className="mr-1.5 accent-red-600 w-3.5 h-3.5" /> 緊急預約碼(只適用今天或明天)
+                            }} className="mr-1.5 accent-red-600 w-3.5 h-3.5" /> 緊急預約
                         </label>
                     </div>
                     {formData.mode === 'single' ? (
@@ -932,7 +1107,7 @@ function AdminLogin({ onLogin }) {
 // ==========================================
 // ⚙️ 頁面 4：管理後台 (AdminPanel) 包含左右選單
 // ==========================================
-function AdminPanel({ db, saveDB, subPage, setSubPage, onLogout, showAlert, showConfirm, setPrintData }) {
+function AdminPanel({ db, api, subPage, setSubPage, onLogout, showAlert, showConfirm, setPrintData }) {
   const [editModal, setEditModal] = useState({ show: false, type: null, index: null, data: null });
   const fileInputRef = useRef(null);
 
@@ -993,13 +1168,13 @@ function AdminPanel({ db, saveDB, subPage, setSubPage, onLogout, showAlert, show
             }
             const ok = await showConfirm("⚠️ 警告：匯入備份將完全覆蓋目前所有的系統與預約資料！\n確定要繼續嗎？", "匯入系統備份", "🚨");
             if (ok) {
-                await saveDB(importedData, true);
+                await api.adminOverwriteAll(importedData);
                 showAlert("✅ 備份已成功還原！", "成功", "🎉");
             }
         } catch (error) {
             showAlert(`❌ 匯入失敗：${error.message}`, "錯誤", "❌");
         }
-        event.target.value = ''; // 清除輸入以便可以重複選取
+        event.target.value = ''; 
     };
     reader.readAsText(file);
   };
@@ -1010,7 +1185,6 @@ function AdminPanel({ db, saveDB, subPage, setSubPage, onLogout, showAlert, show
 
       let repairedDb = { ...db };
       
-      // 確保陣列結構不為 null/undefined，否則填入預設值
       repairedDb.carts = Array.isArray(repairedDb.carts) && repairedDb.carts.length > 0 ? repairedDb.carts : defaultDB.carts;
       repairedDb.classes = Array.isArray(repairedDb.classes) && repairedDb.classes.length > 0 ? repairedDb.classes : defaultDB.classes;
       repairedDb.timeSlots = Array.isArray(repairedDb.timeSlots) && repairedDb.timeSlots.length > 0 ? repairedDb.timeSlots : defaultDB.timeSlots;
@@ -1021,15 +1195,13 @@ function AdminPanel({ db, saveDB, subPage, setSubPage, onLogout, showAlert, show
       repairedDb.bookingCodes = Array.isArray(repairedDb.bookingCodes) ? repairedDb.bookingCodes : [];
       repairedDb.admins = Array.isArray(repairedDb.admins) && repairedDb.admins.length > 0 ? repairedDb.admins : defaultDB.admins;
 
-      // 修復 Booking 資料 (過濾掉損壞資料並去重)
       if (Array.isArray(repairedDb.bookings)) {
           let validBookings = [];
           let seenIds = new Set();
           repairedDb.bookings.forEach(b => {
-              // 只保留有正確 ID、時間、日期的有效紀錄，並剔除重複項目
               if (b && b.id && b.timeSlot && b.date && !seenIds.has(b.id)) {
                   seenIds.add(b.id);
-                  if(!b.status) b.status = 'pending'; // 修復遺失狀態
+                  if(!b.status) b.status = 'pending'; 
                   validBookings.push(b);
               }
           });
@@ -1038,15 +1210,24 @@ function AdminPanel({ db, saveDB, subPage, setSubPage, onLogout, showAlert, show
           repairedDb.bookings = [];
       }
 
-      await saveDB(repairedDb, true);
-      showAlert("✅ 系統結構與資料修復完成！所有異常參數已自動校正。", "修復成功", "🔧");
+      try {
+          await api.adminOverwriteAll(repairedDb);
+          showAlert("✅ 系統結構與資料修復完成！所有異常參數已自動校正。", "修復成功", "🔧");
+      } catch(e) {
+          showAlert("❌ 修復失敗：" + e.message, "錯誤", "❌");
+      }
   };
 
   const clearData = async () => {
       const ok = await showConfirm("⚠️ 嚴重警告：此操作將永久刪除所有預約紀錄！\n確定要清空嗎？", "清空歷史紀錄", "🚨");
       if (ok) {
           const uDb = {...db, bookings: []};
-          await saveDB(uDb, true);
+          try {
+              await api.adminOverwriteAll(uDb);
+              showAlert("✅ 歷史紀錄已清空", "成功", "✅");
+          } catch(e) {
+              showAlert("❌ 清空失敗：" + e.message, "錯誤", "❌");
+          }
       }
   };
 
@@ -1089,6 +1270,13 @@ function AdminPanel({ db, saveDB, subPage, setSubPage, onLogout, showAlert, show
               b.observation = editModal.data.observation || '否';
               b.itSupport = editModal.data.itSupport || '否';
               b.pickupMethod = editModal.data.pickupMethod;
+              
+              try {
+                  await api.adminUpdateBookings([b]);
+                  closeEdit();
+              } catch(e) {
+                  showAlert("❌ 儲存失敗：" + e.message, "錯誤", "❌");
+              }
           }
       } else {
           uDb[editModal.type][editModal.index] = editModal.data;
@@ -1096,9 +1284,13 @@ function AdminPanel({ db, saveDB, subPage, setSubPage, onLogout, showAlert, show
               uDb.admins[editModal.index].password = await hashPassword(editModal.data.newPassword);
               delete uDb.admins[editModal.index].newPassword;
           }
+          try {
+              await api.adminSaveSettings(uDb);
+              closeEdit();
+          } catch(e) {
+              showAlert("❌ 儲存設定失敗：" + e.message, "錯誤", "❌");
+          }
       }
-      await saveDB(uDb, true);
-      closeEdit();
   };
 
   const NavButton = ({ id, icon, label, bgActive = 'bg-slate-900 text-white shadow-md' }) => {
@@ -1148,15 +1340,15 @@ function AdminPanel({ db, saveDB, subPage, setSubPage, onLogout, showAlert, show
 
         {/* 右側內容區塊 */}
         <div className="flex-grow min-w-0">
-            {subPage === 'assign' && <AdminAssign db={db} saveDB={saveDB} showAlert={showAlert} showConfirm={showConfirm} setPrintData={setPrintData} openEdit={openEdit} />}
-            {subPage === 'display' && <AdminDisplay db={db} saveDB={saveDB} showAlert={showAlert} />}
-            {subPage === 'timeslots' && <AdminTimeSlots db={db} saveDB={saveDB} showAlert={showAlert} showConfirm={showConfirm} openEdit={openEdit} />}
-            {subPage === 'classes' && <AdminClasses db={db} saveDB={saveDB} showAlert={showAlert} showConfirm={showConfirm} openEdit={openEdit} />}
-            {subPage === 'carts' && <AdminCarts db={db} saveDB={saveDB} showAlert={showAlert} showConfirm={showConfirm} openEdit={openEdit} />}
-            {subPage === 'pickups' && <AdminPickups db={db} saveDB={saveDB} showAlert={showAlert} showConfirm={showConfirm} openEdit={openEdit} />}
-            {subPage === 'codes' && <AdminCodes db={db} saveDB={saveDB} showAlert={showAlert} showConfirm={showConfirm} />}
-            {subPage === 'holidays' && <AdminHolidays db={db} saveDB={saveDB} showAlert={showAlert} showConfirm={showConfirm} />}
-            {subPage === 'admins' && <AdminAdmins db={db} saveDB={saveDB} showAlert={showAlert} showConfirm={showConfirm} openEdit={openEdit} />}
+            {subPage === 'assign' && <AdminAssign db={db} api={api} showAlert={showAlert} showConfirm={showConfirm} setPrintData={setPrintData} openEdit={openEdit} />}
+            {subPage === 'display' && <AdminDisplay db={db} api={api} showAlert={showAlert} />}
+            {subPage === 'timeslots' && <AdminTimeSlots db={db} api={api} showAlert={showAlert} showConfirm={showConfirm} openEdit={openEdit} />}
+            {subPage === 'classes' && <AdminClasses db={db} api={api} showAlert={showAlert} showConfirm={showConfirm} openEdit={openEdit} />}
+            {subPage === 'carts' && <AdminCarts db={db} api={api} showAlert={showAlert} showConfirm={showConfirm} openEdit={openEdit} />}
+            {subPage === 'pickups' && <AdminPickups db={db} api={api} showAlert={showAlert} showConfirm={showConfirm} openEdit={openEdit} />}
+            {subPage === 'codes' && <AdminCodes db={db} api={api} showAlert={showAlert} showConfirm={showConfirm} />}
+            {subPage === 'holidays' && <AdminHolidays db={db} api={api} showAlert={showAlert} showConfirm={showConfirm} />}
+            {subPage === 'admins' && <AdminAdmins db={db} api={api} showAlert={showAlert} showConfirm={showConfirm} openEdit={openEdit} />}
         </div>
       </div>
 
@@ -1254,7 +1446,7 @@ function AdminPanel({ db, saveDB, subPage, setSubPage, onLogout, showAlert, show
 // 後台各子頁面組件
 // ------------------------------------------
 
-function AdminAssign({ db, saveDB, showAlert, showConfirm, setPrintData, openEdit }) {
+function AdminAssign({ db, api, showAlert, showConfirm, setPrintData, openEdit }) {
     const [printDate, setPrintDate] = useState(DateUtils.toISODate(DateUtils.today()));
     const [filterDate, setFilterDate] = useState(DateUtils.toISODate(DateUtils.today()));
     const [selectedCartsForPrint, setSelectedCarts] = useState([]);
@@ -1296,15 +1488,15 @@ function AdminAssign({ db, saveDB, showAlert, showConfirm, setPrintData, openEdi
             if(!ok) return;
         }
 
-        const uDb = {...db};
-        const updatedB = uDb.bookings.find(x => x.id === bid);
-        updatedB.status = 'assigned';
-        updatedB.cartAssignedId = cid;
-        updatedB.cartAssignedName = cart.name;
-        updatedB.ipadNumbers = stringifyIpadNumbers(parsedIpads);
+        const updatedB = { ...b, status: 'assigned', cartAssignedId: cid, cartAssignedName: cart.name, ipadNumbers: stringifyIpadNumbers(parsedIpads) };
         if(pickup) updatedB.pickupMethod = pickup;
         
-        await saveDB(uDb);
+        try {
+            await api.adminUpdateBookings([updatedB]);
+            showAlert("✅ 成功分配車輛！", "成功", "✅");
+        } catch(e) {
+            showAlert("❌ 處理失敗：" + e.message, "錯誤", "❌");
+        }
     };
 
     return (
@@ -1335,11 +1527,11 @@ function AdminAssign({ db, saveDB, showAlert, showConfirm, setPrintData, openEdi
 
             {/* 待處理 */}
             <div className="bg-white p-6 md:p-8 rounded-3xl border shadow-sm">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-slate-100 pb-3 gap-3">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b pb-3 gap-3">
                     <h2 className="text-xl md:text-2xl font-extrabold text-slate-800 flex items-center gap-2"><Clock className="text-amber-500" /> 待處理預約</h2>
                     <button onClick={async () => {
                         const pendingBookings = db.bookings.filter(b => b.status === 'pending');
-                        let approvedCount = 0; let hasError = false;
+                        let updatedList = []; let hasError = false;
 
                         for (let b of pendingBookings) {
                             const cid = getPendingVal(b.id, 'cart', '');
@@ -1364,12 +1556,17 @@ function AdminAssign({ db, saveDB, showAlert, showConfirm, setPrintData, openEdi
                                     if(!ok) { hasError = true; continue; }
                                 }
 
-                                b.status = 'assigned'; b.cartAssignedId = cid; b.cartAssignedName = cart.name; b.ipadNumbers = finalIpadString;
-                                b.pickupMethod = pickup;
-                                approvedCount++;
+                                updatedList.push({ ...b, status: 'assigned', cartAssignedId: cid, cartAssignedName: cart.name, ipadNumbers: finalIpadString, pickupMethod: pickup });
                             }
                         }
-                        if (approvedCount > 0) { await saveDB({...db}); showAlert(`✅ 已成功批量核准 ${approvedCount} 筆預約！`, "成功", "✅"); } 
+                        if (updatedList.length > 0) { 
+                            try {
+                                await api.adminUpdateBookings(updatedList);
+                                showAlert(`✅ 已成功批量核准 ${updatedList.length} 筆預約！`, "成功", "✅"); 
+                            } catch(e) {
+                                showAlert("❌ 處理失敗：" + e.message, "錯誤", "❌");
+                            }
+                        } 
                         else if (!hasError) { showAlert("請至少為一筆預約選擇分配車輛！", "提示", "⚠️"); }
                     }} className="w-full sm:w-auto bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-sky-700 transition-colors">一鍵批量核准</button>
                 </div>
@@ -1420,13 +1617,13 @@ function AdminAssign({ db, saveDB, showAlert, showConfirm, setPrintData, openEdi
 
             {/* 已處理 */}
             <div className="bg-white p-6 md:p-8 rounded-3xl border shadow-sm mt-8">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-slate-100 pb-3 gap-3">
-                    <h2 className="text-xl md:text-2xl font-extrabold text-slate-800 flex items-center gap-2"><CheckCircle className="text-emerald-500" /> 已處理紀錄</h2>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b pb-3 gap-3">
+                    <h2 className="text-xl md:text-2xl font-extrabold flex items-center gap-2 text-gray-800"><CheckCircle className="text-emerald-500" /> 已處理紀錄</h2>
                     <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="px-4 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-400 font-bold bg-slate-50" />
                 </div>
                 <div className="overflow-x-auto custom-scrollbar pb-2">
                     <table className="w-full text-sm text-left min-w-[600px]">
-                        <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-extrabold">
+                        <thead className="bg-slate-50 border-b text-xs uppercase text-slate-500 font-extrabold">
                             <tr><th className="px-4 py-3 rounded-tl-xl">預約時間</th><th className="px-4 py-3">教師 / 需求</th><th className="px-4 py-3">狀態 / 分配結果</th><th className="px-4 py-3 text-center">操作</th></tr>
                         </thead>
                         <tbody>
@@ -1440,7 +1637,7 @@ function AdminAssign({ db, saveDB, showAlert, showConfirm, setPrintData, openEdi
                                             <b>{b.teacher}</b><br /><span className="text-xs text-slate-500">{b.className} ({b.peopleCount}人)</span>
                                             <div className="flex flex-wrap gap-1 mt-1.5">
                                                 {b.observation === '是' && <span className="text-[10px] text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded font-bold">觀課</span>}
-                                                {b.itSupport === '是' && <span className="text-[10px] text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded font-bold">需IT</span>}
+                                                {b.itSupport === '是' && <span className="text-[10px] text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded font-bold">需IT協助</span>}
                                             </div>
                                             {b.remarks && <div className="mt-1 text-[10px] text-sky-700 bg-sky-50 border border-sky-100 px-1.5 py-0.5 rounded inline-block max-w-[150px] truncate" title={b.remarks}>備註: {b.remarks}</div>}
                                         </td>
@@ -1507,7 +1704,7 @@ function AdminAssign({ db, saveDB, showAlert, showConfirm, setPrintData, openEdi
     );
 }
 
-function AdminDisplay({ db, saveDB }) {
+function AdminDisplay({ db, api, showAlert }) {
     const ds = db.displaySettings || { teacher: true, className: true, observation: true, ipadNumbers: true, pickupMethod: false, itSupport: false, remarks: false };
     const order = db.displayOrder || DEFAULT_DISPLAY_ORDER;
     const [localDs, setLocalDs] = useState(ds);
@@ -1516,7 +1713,12 @@ function AdminDisplay({ db, saveDB }) {
 
     const handleSave = async () => {
         const uDb = {...db, displaySettings: localDs, displayOrder: localOrder};
-        await saveDB(uDb, true);
+        try {
+            await api.adminSaveSettings(uDb);
+            showAlert("✅ 設定已儲存！", "成功", "✅");
+        } catch(e) {
+            showAlert("❌ 儲存失敗：" + e.message, "錯誤", "❌");
+        }
     };
 
     const handleDrop = (e, dropIndex) => {
@@ -1535,7 +1737,7 @@ function AdminDisplay({ db, saveDB }) {
         <div className="bg-white p-6 md:p-8 rounded-3xl border shadow-sm animate-fade-in">
             <h3 className="text-2xl font-extrabold mb-6 text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-2"><Settings className="text-sky-600" /> 總覽表顯示項目</h3>
             <p className="text-sm text-slate-500 mb-6">自訂前台「每日充電車時間表」格子內呈現的資訊與順序 <span className="text-sky-600 font-bold">(可拖拉 ☰ 排序)</span>：</p>
-            <ul className="space-y-3 mb-8 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8 bg-slate-50 p-4 rounded-2xl border border-slate-200">
                 {localOrder.map((key, idx) => (
                     <li key={key} 
                         draggable 
@@ -1556,17 +1758,17 @@ function AdminDisplay({ db, saveDB }) {
     );
 }
 
-function AdminTimeSlots({ db, saveDB, showAlert, showConfirm, openEdit }) {
+function AdminTimeSlots({ db, api, showAlert, showConfirm, openEdit }) {
     const [name, setName] = useState(''); const [time, setTime] = useState(''); const [quota, setQuota] = useState(''); const [remark, setRemark] = useState(''); const [showRmk, setShowRmk] = useState(true); const [days, setDays] = useState([1,2,3,4,5,6,0]);
     const [draggedIdx, setDraggedIdx] = useState(null);
 
     const handleAdd = async () => {
         if(!name) return showAlert("請填寫時段名稱", "提示", "⚠️"); if(days.length===0) return showAlert("請勾選適用星期", "提示", "⚠️");
         const uDb = {...db, timeSlots: [...db.timeSlots, {id: Date.now(), name, timeRange: time, remark, showRemark: showRmk, quota: parseInt(quota, 10)||db.carts.length, applicableDays: days}]};
-        if(await saveDB(uDb)) { setName(''); setTime(''); setQuota(''); setRemark(''); }
+        try { await api.adminSaveSettings(uDb); setName(''); setTime(''); setQuota(''); setRemark(''); } catch(e) {}
     };
     
-    const handleDel = async (i) => { if(await showConfirm("確定刪除此時段？")) { const uDb = {...db}; uDb.timeSlots.splice(i,1); await saveDB(uDb); } };
+    const handleDel = async (i) => { if(await showConfirm("確定刪除此時段？")) { const uDb = {...db}; uDb.timeSlots.splice(i,1); try { await api.adminSaveSettings(uDb); } catch(e){} } };
 
     const handleDrop = async (e, dropIndex) => {
         e.preventDefault();
@@ -1574,8 +1776,7 @@ function AdminTimeSlots({ db, saveDB, showAlert, showConfirm, openEdit }) {
         const newArr = [...db.timeSlots];
         const item = newArr.splice(draggedIdx, 1)[0];
         newArr.splice(dropIndex, 0, item);
-        await saveDB({ ...db, timeSlots: newArr });
-        setDraggedIdx(null);
+        try { await api.adminSaveSettings({ ...db, timeSlots: newArr }); setDraggedIdx(null); } catch(e){}
     };
 
     return (
@@ -1634,16 +1835,16 @@ function AdminTimeSlots({ db, saveDB, showAlert, showConfirm, openEdit }) {
     );
 }
 
-function AdminClasses({ db, saveDB, showAlert, showConfirm, openEdit }) {
+function AdminClasses({ db, api, showAlert, showConfirm, openEdit }) {
     const [name, setName] = useState(''); const [limit, setLimit] = useState(30);
     const [draggedIdx, setDraggedIdx] = useState(null);
 
     const handleAdd = async () => {
         if(!name) return showAlert("請填寫班級", "提示", "⚠️");
         const uDb = {...db, classes: [...db.classes, {id: Date.now(), name, limit}]};
-        if(await saveDB(uDb)) { setName(''); setLimit(30); }
+        try { await api.adminSaveSettings(uDb); setName(''); setLimit(30); } catch(e){}
     };
-    const handleDel = async (i) => { if(await showConfirm("確定刪除？")) { const uDb = {...db}; uDb.classes.splice(i,1); await saveDB(uDb); } };
+    const handleDel = async (i) => { if(await showConfirm("確定刪除？")) { const uDb = {...db}; uDb.classes.splice(i,1); try { await api.adminSaveSettings(uDb); } catch(e){} } };
 
     const handleDrop = async (e, dropIndex) => {
         e.preventDefault();
@@ -1651,8 +1852,7 @@ function AdminClasses({ db, saveDB, showAlert, showConfirm, openEdit }) {
         const newArr = [...db.classes];
         const item = newArr.splice(draggedIdx, 1)[0];
         newArr.splice(dropIndex, 0, item);
-        await saveDB({ ...db, classes: newArr });
-        setDraggedIdx(null);
+        try { await api.adminSaveSettings({ ...db, classes: newArr }); setDraggedIdx(null); } catch(e){}
     };
 
     return (
@@ -1686,16 +1886,16 @@ function AdminClasses({ db, saveDB, showAlert, showConfirm, openEdit }) {
     );
 }
 
-function AdminCarts({ db, saveDB, showAlert, showConfirm, openEdit }) {
+function AdminCarts({ db, api, showAlert, showConfirm, openEdit }) {
     const [name, setName] = useState(''); const [cap, setCap] = useState(30);
     const [draggedIdx, setDraggedIdx] = useState(null);
 
     const handleAdd = async () => {
         if(!name) return showAlert("請填寫車輛", "提示", "⚠️");
         const uDb = {...db, carts: [...db.carts, {id: Date.now(), name, capacity: cap, damaged: ''}]};
-        if(await saveDB(uDb)) { setName(''); setCap(30); }
+        try { await api.adminSaveSettings(uDb); setName(''); setCap(30); } catch(e){}
     };
-    const handleDel = async (i) => { if(await showConfirm("確定刪除？")) { const uDb = {...db}; uDb.carts.splice(i,1); await saveDB(uDb); } };
+    const handleDel = async (i) => { if(await showConfirm("確定刪除？")) { const uDb = {...db}; uDb.carts.splice(i,1); try { await api.adminSaveSettings(uDb); } catch(e){} } };
 
     const handleDrop = async (e, dropIndex) => {
         e.preventDefault();
@@ -1703,8 +1903,7 @@ function AdminCarts({ db, saveDB, showAlert, showConfirm, openEdit }) {
         const newArr = [...db.carts];
         const item = newArr.splice(draggedIdx, 1)[0];
         newArr.splice(dropIndex, 0, item);
-        await saveDB({ ...db, carts: newArr });
-        setDraggedIdx(null);
+        try { await api.adminSaveSettings({ ...db, carts: newArr }); setDraggedIdx(null); } catch(e){}
     };
 
     return (
@@ -1738,18 +1937,18 @@ function AdminCarts({ db, saveDB, showAlert, showConfirm, openEdit }) {
     );
 }
 
-function AdminPickups({ db, saveDB, showAlert, showConfirm, openEdit }) {
+function AdminPickups({ db, api, showAlert, showConfirm, openEdit }) {
     const [name, setName] = useState('');
     const [draggedIdx, setDraggedIdx] = useState(null);
 
     const handleAdd = async () => {
         if(!name) return showAlert("請填寫名稱", "提示", "⚠️");
         const uDb = {...db, pickupMethods: [...db.pickupMethods, {id: Date.now(), name}]};
-        if(await saveDB(uDb)) setName('');
+        try { await api.adminSaveSettings(uDb); setName(''); } catch(e){}
     };
     const handleDel = async (i) => { 
         if(db.pickupMethods.length<=1) return showAlert("需保留至少一種方式", "提示", "⚠️");
-        if(await showConfirm("確定刪除？")) { const uDb = {...db}; uDb.pickupMethods.splice(i,1); await saveDB(uDb); } 
+        if(await showConfirm("確定刪除？")) { const uDb = {...db}; uDb.pickupMethods.splice(i,1); try { await api.adminSaveSettings(uDb); } catch(e){} } 
     };
 
     const handleDrop = async (e, dropIndex) => {
@@ -1758,8 +1957,7 @@ function AdminPickups({ db, saveDB, showAlert, showConfirm, openEdit }) {
         const newArr = [...db.pickupMethods];
         const item = newArr.splice(draggedIdx, 1)[0];
         newArr.splice(dropIndex, 0, item);
-        await saveDB({ ...db, pickupMethods: newArr });
-        setDraggedIdx(null);
+        try { await api.adminSaveSettings({ ...db, pickupMethods: newArr }); setDraggedIdx(null); } catch(e){}
     };
 
     return (
@@ -1792,17 +1990,17 @@ function AdminPickups({ db, saveDB, showAlert, showConfirm, openEdit }) {
     );
 }
 
-function AdminCodes({ db, saveDB, showAlert, showConfirm }) {
+function AdminCodes({ db, api, showAlert, showConfirm }) {
     const generate = async () => {
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let code = '';
         for(let i=0; i<6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
         const uDb = {...db, bookingCodes: [...db.bookingCodes, {code, used: false, createdAt: new Date().toISOString()}]};
-        await saveDB(uDb, true);
+        try { await api.adminSaveSettings(uDb); } catch(e){}
     };
     const handleDel = async (codeStr) => {
         if(await showConfirm("確定刪除此授權碼？")) {
             const uDb = {...db, bookingCodes: db.bookingCodes.filter(c=>c.code!==codeStr)};
-            await saveDB(uDb);
+            try { await api.adminSaveSettings(uDb); } catch(e){}
         }
     };
 
@@ -1831,15 +2029,15 @@ function AdminCodes({ db, saveDB, showAlert, showConfirm }) {
     );
 }
 
-function AdminHolidays({ db, saveDB, showAlert, showConfirm }) {
+function AdminHolidays({ db, api, showAlert, showConfirm }) {
     const [start, setStart] = useState(''); const [end, setEnd] = useState(''); const [remark, setRemark] = useState('');
     const handleAdd = async () => {
         if(!start || !end || !remark) return showAlert("請完整填寫日期與原因", "提示", "⚠️");
         if(start > end) return showAlert("開始日期不能大於結束日期", "錯誤", "❌");
         const uDb = {...db, holidays: [...db.holidays, {id: Date.now(), startDate: start, endDate: end, remark}]};
-        if(await saveDB(uDb)) { setStart(''); setEnd(''); setRemark(''); }
+        try { await api.adminSaveSettings(uDb); setStart(''); setEnd(''); setRemark(''); } catch(e){}
     };
-    const handleDel = async (i) => { if(await showConfirm("確定刪除？")) { const uDb = {...db}; uDb.holidays.splice(i,1); await saveDB(uDb); } };
+    const handleDel = async (i) => { if(await showConfirm("確定刪除？")) { const uDb = {...db}; uDb.holidays.splice(i,1); try { await api.adminSaveSettings(uDb); } catch(e){} } };
 
     return (
         <div className="bg-white p-6 md:p-8 rounded-3xl border border-red-50 shadow-sm animate-fade-in">
@@ -1867,17 +2065,21 @@ function AdminHolidays({ db, saveDB, showAlert, showConfirm }) {
     );
 }
 
-function AdminAdmins({ db, saveDB, showAlert, showConfirm, openEdit }) {
+function AdminAdmins({ db, api, showAlert, showConfirm, openEdit }) {
     const [u, setU] = useState(''); const [p, setP] = useState('');
     const handleAdd = async () => {
         if(!u || !p) return showAlert("請填寫帳號密碼", "提示", "⚠️");
         if(db.admins.find(a=>a.username===u)) return showAlert("帳號已存在", "錯誤", "❌");
-        const uDb = {...db, admins: [...db.admins, {username: u, password: await hashPassword(p)}]};
-        if(await saveDB(uDb, true)) { setU(''); setP(''); }
+        try {
+            const hashedPwd = await hashPassword(p);
+            const uDb = {...db, admins: [...db.admins, {username: u, password: hashedPwd}]};
+            await api.adminSaveSettings(uDb); 
+            setU(''); setP('');
+        } catch(e) {}
     };
     const handleDel = async (i) => {
         if(db.admins.length<=1) return showAlert("需保留至少一個帳號", "提示", "⚠️");
-        if(await showConfirm("確定刪除？")) { const uDb = {...db}; uDb.admins.splice(i,1); await saveDB(uDb); }
+        if(await showConfirm("確定刪除？")) { const uDb = {...db}; uDb.admins.splice(i,1); try { await api.adminSaveSettings(uDb); } catch(e){} }
     };
 
     return (
