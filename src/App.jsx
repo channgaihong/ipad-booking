@@ -15,6 +15,7 @@ const doubleQuote = quoteChar + quoteChar;
 const API_URL = ["https:", "", "script.google.com", "macros", "s", "AKfycbwoEBK86I5vvf6RScyYNxLGOIVz9SbuFLARCQ-LhzsjvthkMrHwx7unVLfA97LeuQw", "exec"].join(slashChar);
 
 const dayMap = { 0: '日', 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六' };
+// 💡 更新預設排序
 const DEFAULT_DISPLAY_ORDER = ['observation', 'teacher', 'className', 'pickupMethod', 'itSupport', 'ipadNumbers', 'remarks'];
 
 const DateUtils = {
@@ -211,19 +212,24 @@ export default function App() {
           onAuthStateChanged(auth, user => {
             if (user) {
               setIsFirebaseReady(true);
-              const appId = typeof window.__app_id !== 'undefined' ? String(window.__app_id).split(slashChar).join('_') : 'ipad-booking-app';
+              const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
               const docRef = doc(fs, 'artifacts', appId, 'public', 'data', 'ipad_db', 'global_state');
+              
               onSnapshot(docRef, (snapshot) => {
                 if (snapshot.exists()) {
                   const fetchedDb = snapshot.data();
                   if (!fetchedDb.pickupMethods) fetchedDb.pickupMethods = [{id: 1, name: "送到課室"}, {id: 2, name: "送到教員室"}, {id: 3, name: "自取"}];
+                  if (!fetchedDb.displayOrder || fetchedDb.displayOrder.length === 0) fetchedDb.displayOrder = [...DEFAULT_DISPLAY_ORDER];
                   setDb(fetchedDb);
                   setLoading(false);
                 } else {
-                  setDoc(docRef, defaultDB);
+                  setDoc(docRef, defaultDB).catch(e => console.error(e));
                   setDb(defaultDB);
                   setLoading(false);
                 }
+              }, (error) => {
+                 console.error("Firestore snapshot error:", error);
+                 // Fallback on error if permissions fail
               });
             }
           });
@@ -239,6 +245,7 @@ export default function App() {
           const data = await res.json();
           if (data && data.carts) {
               if (!data.pickupMethods) data.pickupMethods = [{id: 1, name: "送到課室"}, {id: 2, name: "送到教員室"}, {id: 3, name: "自取"}];
+              if (!data.displayOrder || data.displayOrder.length === 0) data.displayOrder = [...DEFAULT_DISPLAY_ORDER];
               setDb(data);
           }
         } catch (e) {
@@ -273,7 +280,7 @@ export default function App() {
         }
         
         if (isFirebaseReady && firestoreInstance) {
-          const appId = typeof window.__app_id !== 'undefined' ? String(window.__app_id).split(slashChar).join('_') : 'ipad-booking-app';
+          const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
           await setDoc(doc(firestoreInstance, 'artifacts', appId, 'public', 'data', 'ipad_db', 'global_state'), updatedDB);
         }
         
@@ -304,7 +311,7 @@ export default function App() {
         if (bIndex > -1) updatedDB.bookings[bIndex].status = 'cancelled';
         
         if (isFirebaseReady && firestoreInstance) {
-          const appId = typeof window.__app_id !== 'undefined' ? String(window.__app_id).split(slashChar).join('_') : 'ipad-booking-app';
+          const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
           await setDoc(doc(firestoreInstance, 'artifacts', appId, 'public', 'data', 'ipad_db', 'global_state'), updatedDB);
         }
         
@@ -331,7 +338,7 @@ export default function App() {
       setLoading(true);
       try {
         if (isFirebaseReady && firestoreInstance) {
-          const appId = typeof window.__app_id !== 'undefined' ? String(window.__app_id).split(slashChar).join('_') : 'ipad-booking-app';
+          const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
           await setDoc(doc(firestoreInstance, 'artifacts', appId, 'public', 'data', 'ipad_db', 'global_state'), newDbConfig);
         }
         
@@ -364,7 +371,7 @@ export default function App() {
         });
         
         if (isFirebaseReady && firestoreInstance) {
-          const appId = typeof window.__app_id !== 'undefined' ? String(window.__app_id).split(slashChar).join('_') : 'ipad-booking-app';
+          const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
           await setDoc(doc(firestoreInstance, 'artifacts', appId, 'public', 'data', 'ipad_db', 'global_state'), newDb);
         }
         
@@ -391,7 +398,7 @@ export default function App() {
       setLoading(true);
       try {
         if (isFirebaseReady && firestoreInstance) {
-          const appId = typeof window.__app_id !== 'undefined' ? String(window.__app_id).split(slashChar).join('_') : 'ipad-booking-app';
+          const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
           await setDoc(doc(firestoreInstance, 'artifacts', appId, 'public', 'data', 'ipad_db', 'global_state'), newDbConfig);
         }
         
@@ -527,14 +534,14 @@ function PrintOverlay({ db, printData, onClose }) {
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
             @page { 
-                size: A5 landscape; 
+                size: 210mm 148mm; 
                 margin: 0 !important; 
             }
             html, body { 
-                height: auto !important; 
                 width: 210mm !important;
+                height: 148mm !important;
                 overflow: visible !important; 
-                background: white; 
+                background: white !important; 
                 margin: 0 !important; 
                 padding: 0 !important; 
             }
@@ -560,7 +567,7 @@ function PrintOverlay({ db, printData, onClose }) {
             .a5-container { 
                 width: 210mm !important; 
                 height: 147.5mm !important; 
-                padding: 5mm !important; 
+                padding: 10mm !important; 
                 display: block !important; 
                 box-sizing: border-box !important; 
                 box-shadow: none !important; 
@@ -569,6 +576,7 @@ function PrintOverlay({ db, printData, onClose }) {
                 page-break-after: always !important;
                 page-break-inside: avoid !important;
                 overflow: hidden !important;
+                background: white !important;
             }
             .a5-container:last-child {
                 page-break-after: auto !important;
@@ -586,25 +594,25 @@ function PrintOverlay({ db, printData, onClose }) {
       
       {/* 加上 print:p-0 print:m-0 確保列印模式沒有外層間距 */}
       <div className="p-4 sm:p-8 space-y-8 print:p-0 print:space-y-0 print:block flex flex-col items-center">
-        {cartsToPrint.map((cart) => {
+        {cartsToPrint.map((cart, idx) => {
            const cartBookings = dayBookings.filter(x => x.cartAssignedId == cart.id);
            return (
               <div 
                   key={cart.id} 
-                  className="a5-container p-6 bg-white border-2 border-slate-800 rounded-2xl shadow-xl w-full max-w-[210mm] print:max-w-none print:p-0 print:mb-0 print:rounded-none print:shadow-none"
+                  className={`a5-container p-6 bg-white border-2 border-slate-800 rounded-2xl shadow-xl w-full max-w-[210mm] print:max-w-none print:p-0 print:mb-0 print:rounded-none print:shadow-none ${idx !== cartsToPrint.length - 1 ? 'page-break-after' : ''}`}
               >
-                <div className="flex justify-between items-end border-b border-slate-400 pb-1 mb-2">
+                <div className="flex justify-between items-end border-b-2 border-slate-400 pb-1 mb-2">
                   <div className="flex items-center space-x-2">
-                    <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center text-white text-lg">📱</div>
+                    <div className="w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center text-white text-xl">📱</div>
                     <div>
-                      <h2 className="text-xl font-bold">{cart.name}</h2>
+                      <h2 className="text-2xl font-bold">{cart.name}</h2>
                       <p className="text-xs text-slate-600">{DateUtils.toChineseDate(date)}</p>
                     </div>
                   </div>
-                  <div className="text-right"><p className="text-base font-bold text-slate-700">iPad 借用登記表</p></div>
+                  <div className="text-right"><p className="text-lg font-bold text-slate-700">iPad 借用登記表</p></div>
                 </div>
                 {/* 內部表格字體縮小以防撐破版面 */}
-                <table className="w-full border-collapse border border-slate-800 text-[10px] sm:text-xs text-center">
+                <table className="w-full border-collapse border border-slate-800 text-[11px] sm:text-xs text-center">
                   <thead>
                     <tr className="bg-slate-100">
                       <th className="border border-slate-800 p-1.5 w-[8%]">節次</th>
@@ -622,7 +630,7 @@ function PrintOverlay({ db, printData, onClose }) {
                       const bList = cartBookings.filter(x => x.timeSlot === slot.name);
                       if (bList.length === 0) return null;
                       return bList.map(b => (
-                        <tr key={b.id} className="h-8">
+                        <tr key={b.id} className="h-9">
                           <td className="border border-slate-800 font-bold">{slot.name}</td>
                           <td className="border border-slate-800">{slot.timeRange || ''}</td>
                           <td className="border border-slate-800 font-bold">
@@ -632,13 +640,13 @@ function PrintOverlay({ db, printData, onClose }) {
                           <td className="border border-slate-800">{b.className}</td>
                           <td className="border border-slate-800 font-bold">{b.peopleCount}</td>
                           <td className="border border-slate-800">{b.pickupMethod || ''}</td>
-                          <td className="border border-slate-800 text-[9px] break-words max-w-[150px] p-0.5 leading-tight">{b.ipadNumbers || ''}</td>
-                          <td className="border border-slate-800 text-left px-1 text-[9px] truncate max-w-[100px]">{b.remarks || ''}</td>
+                          <td className="border border-slate-800 text-[10px] break-words max-w-[150px] p-0.5 leading-tight">{b.ipadNumbers || ''}</td>
+                          <td className="border border-slate-800 text-left px-1 text-[10px] truncate max-w-[100px]">{b.remarks || ''}</td>
                         </tr>
                       ));
                     })}
                     {cartBookings.length === 0 && (
-                      <tr><td colSpan="8" className="border border-slate-800 p-3 text-center text-slate-500 font-bold">本日該車無分配紀錄</td></tr>
+                      <tr><td colSpan="8" className="border border-slate-800 p-4 text-center text-slate-500 font-bold">本日該車無分配紀錄</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -698,10 +706,10 @@ function SchedulePage({ db }) {
                                   if (!ds[key]) return null;
                                   switch(key) {
                                       case 'teacher': return b.teacher ? <div key="teacher" className="font-bold text-sm leading-tight">{b.teacher}</div> : null;
-                                      case 'observation': return b.observation === '是' ? <div key="obs"><span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded animate-pulse">觀課</span></div> : null;
+                                      case 'observation': return b.observation === '是' ? <div key="obs"><span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded animate-pulse shadow-sm">觀課</span></div> : null;
                                       case 'className': return b.className ? <div key="class" className="text-xs">{b.className}</div> : null;
                                       case 'pickupMethod': return b.pickupMethod ? <div key="pickup" className="text-[10px] text-slate-600">📦 {b.pickupMethod}</div> : null;
-                                      case 'itSupport': return b.itSupport === '是' ? <div key="it" className="text-[10px] text-blue-700 font-bold">💻 需 IT協助</div> : null;
+                                      case 'itSupport': return b.itSupport === '是' ? <div key="it" className="text-[10px] text-blue-700 font-bold">💻 需 IT</div> : null;
                                       case 'ipadNumbers': return b.ipadNumbers ? <div key="ipad" className="text-[10px] bg-white/70 rounded px-1 py-0.5 font-mono truncate max-w-full" title={b.ipadNumbers}>📱 {b.ipadNumbers}</div> : null;
                                       case 'remarks': return b.remarks ? <div key="rmk" className="text-[10px] text-slate-500 italic truncate max-w-full" title={b.remarks}>📝 {b.remarks}</div> : null;
                                       default: return null;
@@ -1061,7 +1069,7 @@ function BookingPage({ db, api, showAlert, showConfirm }) {
                                   {b.observation === '是' && (<span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded ml-1 font-bold">觀課</span>)}
                                 </div>
                                 <div className="text-sm text-slate-500 mt-1 font-medium flex items-center gap-1.5"><CalendarIcon className="w-3.5 h-3.5" /> {b.date} <Clock className="w-3.5 h-3.5 ml-1" /> {b.timeSlot}</div>
-                                {b.remarks && (<div className="text-xs text-sky-600 mt-2 bg-sky-50 px-2 py-1 rounded inline-block">備註: {b.remarks}</div>)}
+                                {b.remarks && (<div className="text-[11px] text-sky-700 mt-2 bg-sky-50 px-2 py-1 rounded block w-full whitespace-pre-line break-words">備註: {b.remarks}</div>)}
                             </div>
                             <div className="text-right flex flex-col items-start sm:items-end gap-2 w-full sm:w-auto bg-slate-50 sm:bg-transparent p-3 sm:p-0 rounded-lg">
                                 {b.status === 'assigned' && (<span className="text-emerald-600 font-extrabold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-sm flex items-center gap-1">✅ {b.cartAssignedName} <span className="text-xs font-normal text-emerald-700 block ml-1">{b.ipadNumbers && (`📱${b.ipadNumbers}`)}</span></span>)}
@@ -1218,17 +1226,8 @@ function AdminPanel({ db, api, subPage, setSubPage, onLogout, showAlert, showCon
       }
   };
 
-  const clearData = async () => {
-      const ok = await showConfirm("⚠️ 嚴重警告：此操作將永久刪除所有預約紀錄！\n確定要清空嗎？", "清空歷史紀錄", "🚨");
-      if (ok) {
-          const uDb = {...db, bookings: []};
-          try {
-              await api.adminOverwriteAll(uDb);
-              showAlert("✅ 歷史紀錄已清空", "成功", "✅");
-          } catch(e) {
-              showAlert("❌ 清空失敗：" + e.message, "錯誤", "❌");
-          }
-      }
+  const clearData = () => {
+      setEditModal({ show: true, type: 'clearBookings', index: -1, data: {} });
   };
 
   const openEdit = (type, index) => {
@@ -1239,6 +1238,26 @@ function AdminPanel({ db, api, subPage, setSubPage, onLogout, showAlert, showCon
   const closeEdit = () => setEditModal({ show: false, type: null, index: null, data: null });
 
   const saveEdit = async () => {
+      if (editModal.type === 'clearBookings') {
+          const pwd = editModal.data.pwd?.trim();
+          if (!pwd) return showAlert("請輸入密碼！", "提示", "⚠️");
+          
+          const hashedPwd = await hashPassword(pwd);
+          if (hashedPwd !== loggedAdminHash) {
+              return showAlert("密碼錯誤！拒絕清理。", "錯誤", "❌");
+          }
+          
+          const uDb = {...db, bookings: []};
+          try {
+              await api.adminOverwriteAll(uDb);
+              closeEdit();
+              showAlert("✅ 已成功清空所有歷史預約紀錄。", "清理完成", "🗑️");
+          } catch(e) {
+              showAlert("❌ 清空失敗：" + e.message, "錯誤", "❌");
+          }
+          return;
+      }
+
       const uDb = { ...db };
       if (editModal.type === 'bookings') {
           const bIndex = uDb.bookings.findIndex(x => x.id === editModal.index);
@@ -1356,8 +1375,19 @@ function AdminPanel({ db, api, subPage, setSubPage, onLogout, showAlert, showCon
       {editModal.show && (
           <div className="fixed inset-0 bg-black/60 z-[1000] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
               <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-md shadow-2xl">
-                  <h3 className="text-xl font-extrabold mb-4 border-b border-slate-100 pb-3 text-slate-800">編輯項目</h3>
+                  <h3 className="text-xl font-extrabold mb-4 border-b border-slate-100 pb-3 text-slate-800">
+                    {editModal.type === 'clearBookings' ? <span className="text-red-600 flex items-center gap-2"><ShieldAlert /> 嚴重警告：清理歷史紀錄</span> : '編輯項目'}
+                  </h3>
                   <div className="space-y-4 mt-4">
+                      {editModal.type === 'clearBookings' && (
+                          <div className="space-y-4">
+                              <p className="text-sm text-slate-700 font-medium">此操作將會永久刪除所有預約紀錄，且無法復原！</p>
+                              <div>
+                                  <label className="text-xs text-slate-500 block mb-1">請輸入管理員密碼以確認執行</label>
+                                  <input type="password" value={editModal.data.pwd || ''} onChange={e => setEditModal(p => ({...p, data: {...p.data, pwd: e.target.value}}))} className="w-full px-3 py-2 border border-red-300 rounded-lg text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" placeholder="目前登入的管理員密碼" />
+                              </div>
+                          </div>
+                      )}
                       {editModal.type === 'bookings' && (
                           <>
                               <div>
@@ -1433,7 +1463,7 @@ function AdminPanel({ db, api, subPage, setSubPage, onLogout, showAlert, showCon
                   </div>
                   <div className="mt-8 flex justify-end gap-3">
                       <button onClick={closeEdit} className="px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors w-full sm:w-auto">取消</button>
-                      <button onClick={saveEdit} className="px-5 py-2.5 bg-sky-600 text-white rounded-xl font-bold hover:bg-sky-700 shadow-md transition-colors w-full sm:w-auto">儲存變更</button>
+                      <button onClick={saveEdit} className={`px-5 py-2.5 text-white rounded-xl font-bold shadow-md transition-colors w-full sm:w-auto ${editModal.type === 'clearBookings' ? 'bg-red-600 hover:bg-red-700' : 'bg-sky-600 hover:bg-sky-700'}`}>儲存變更</button>
                   </div>
               </div>
           </div>
@@ -1454,7 +1484,15 @@ function AdminAssign({ db, api, showAlert, showConfirm, setPrintData, openEdit }
     const [pendingInputs, setPendingInputs] = useState({});
 
     const pending = db.bookings.filter(b => b.status === 'pending');
-    const processed = db.bookings.filter(b => b.status !== 'pending' && b.date === filterDate);
+    
+    // 💡 依據設定檔的時段順序進行智慧排序
+    const timeSlotOrder = {};
+    db.timeSlots.forEach((ts, idx) => { timeSlotOrder[ts.name] = idx; });
+    const processed = db.bookings.filter(b => b.status !== 'pending' && b.date === filterDate).sort((a, b) => {
+        const orderA = timeSlotOrder[a.timeSlot] ?? 999;
+        const orderB = timeSlotOrder[b.timeSlot] ?? 999;
+        return orderA - orderB;
+    });
 
     const toggleCartPrint = (id) => setSelectedCarts(p => p.includes(id) ? p.filter(x=>x!==id) : [...p, id]);
 
@@ -1521,7 +1559,7 @@ function AdminAssign({ db, api, showAlert, showConfirm, setPrintData, openEdit }
                             ))}
                         </div>
                     </div>
-                    <button onClick={handlePrint} className="w-full lg:w-auto bg-sky-700 text-white px-8 py-3 rounded-xl font-extrabold shadow-lg hover:bg-sky-800 hover:-translate-y-0.5 transition-all whitespace-nowrap">列印預覽</button>
+                    <button onClick={handlePrint} className="w-full lg:w-auto bg-sky-700 text-white px-8 py-3 rounded-xl font-extrabold shadow-lg hover:bg-sky-800 hover:-translate-y-0.5 transition-all whitespace-nowrap">列印</button>
                 </div>
             </div>
 
@@ -1575,7 +1613,7 @@ function AdminAssign({ db, api, showAlert, showConfirm, setPrintData, openEdit }
                         <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200"><CheckCircle className="w-8 h-8 mx-auto mb-2 opacity-50" /> 目前沒有待處理的預約</div>
                     ) : (
                         <table className="w-full text-sm text-left min-w-[800px]">
-                            <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-extrabold">
+                            <thead className="bg-slate-50 border-b text-xs uppercase text-slate-500 font-extrabold">
                                 <tr><th className="px-4 py-3 rounded-tl-xl">時間 / 需求</th><th className="px-4 py-3">分配車輛 & 方式</th><th className="px-4 py-3 w-1/4">iPad 編號 (可開網格)</th><th className="px-4 py-3 text-center rounded-tr-xl w-24">操作</th></tr>
                             </thead>
                             <tbody>
@@ -1588,14 +1626,14 @@ function AdminAssign({ db, api, showAlert, showConfirm, setPrintData, openEdit }
                                               <span className="text-xs bg-sky-100 px-1.5 py-0.5 rounded text-sky-800 ml-1">{b.className} ({b.peopleCount}人)</span> 
                                               {b.observation === '是' && (<span className="text-[10px] bg-red-100 text-red-600 px-1 py-0.5 rounded ml-1 font-bold">觀課</span>)}
                                             </div>
-                                            {b.remarks && (<div className="mt-1.5 text-xs text-slate-500 italic bg-slate-100 p-1.5 rounded border border-slate-200">備註: {b.remarks}</div>)}
+                                            {b.remarks && (<div className="mt-1.5 text-[11px] text-slate-500 italic bg-slate-100 p-1.5 rounded border border-slate-200 block w-full whitespace-pre-line break-words">備註: {b.remarks}</div>)}
                                         </td>
                                         <td className="px-4 py-4 space-y-2">
                                             <select value={getPendingVal(b.id, 'cart', '')} onChange={(e) => updatePending(b.id, 'cart', e.target.value)} className="w-full text-sm border border-slate-200 rounded-lg py-2 px-2 outline-none focus:ring-2 focus:ring-sky-400 bg-white font-bold text-slate-700"><option value="">--選擇車輛--</option>{db.carts.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
                                             <select value={getPendingVal(b.id, 'pickup', b.pickupMethod)} onChange={(e) => updatePending(b.id, 'pickup', e.target.value)} className="w-full text-xs border border-slate-200 rounded-lg py-1.5 px-2 outline-none focus:ring-2 focus:ring-sky-400 bg-slate-50 text-slate-600">{db.pickupMethods.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}</select>
                                         </td>
                                         <td className="px-4 py-4">
-                                            <div className="flex shadow-sm rounded-lg group">
+                                            <div className="flex shadow-sm rounded-lg">
                                                 <input type="text" value={getPendingVal(b.id, 'ipad', '')} onChange={(e) => updatePending(b.id, 'ipad', e.target.value)} className="w-full text-sm border border-slate-200 border-r-0 rounded-l-lg p-2 outline-none focus:ring-2 focus:ring-sky-400 font-mono" placeholder="例: 1-15" />
                                                 <button onClick={() => {
                                                     const cid = getPendingVal(b.id, 'cart', '');
@@ -1632,20 +1670,20 @@ function AdminAssign({ db, api, showAlert, showConfirm, setPrintData, openEdit }
                             ) : (
                                 processed.map(b => (
                                     <tr key={b.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                                        <td className="px-4 py-3 text-slate-600"><b>{b.date}</b><br />{b.timeSlot}</td>
-                                        <td className="px-4 py-3">
-                                            <b>{b.teacher}</b><br /><span className="text-xs text-slate-500">{b.className} ({b.peopleCount}人)</span>
+                                        <td className="px-4 py-3 text-xs text-slate-600"><b>{b.date}</b><br />{b.timeSlot}</td>
+                                        <td className="px-4 py-3 text-xs">
+                                            <b>{b.teacher}</b><br /><span className="text-slate-500">{b.className} ({b.peopleCount}人)</span>
                                             <div className="flex flex-wrap gap-1 mt-1.5">
                                                 {b.observation === '是' && <span className="text-[10px] text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded font-bold">觀課</span>}
-                                                {b.itSupport === '是' && <span className="text-[10px] text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded font-bold">需IT協助</span>}
+                                                {b.itSupport === '是' && <span className="text-[10px] text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded font-bold">需IT</span>}
                                             </div>
-                                            {b.remarks && <div className="mt-1 text-[10px] text-sky-700 bg-sky-50 border border-sky-100 px-1.5 py-0.5 rounded inline-block max-w-[150px] truncate" title={b.remarks}>備註: {b.remarks}</div>}
+                                            {b.remarks && <div className="mt-1.5 text-[11px] text-sky-700 bg-sky-50 border border-sky-100 px-2 py-1 rounded block w-full whitespace-pre-line break-words">備註: {b.remarks}</div>}
                                         </td>
-                                        <td className="px-4 py-3">
-                                            {b.status === 'assigned' && (<span className="text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-200 text-xs">✅ 已分配</span>)}
-                                            {b.status === 'rejected' && (<span className="text-red-500 font-bold bg-red-50 px-2 py-1 rounded border border-red-200 text-xs">❌ 已退回</span>)}
-                                            {b.status === 'cancelled' && (<span className="text-slate-500 font-bold bg-slate-100 px-2 py-1 rounded border border-slate-200 text-xs">⛔ 已取消</span>)}
-                                            <div className="mt-1.5 text-xs text-slate-600 font-bold">{b.cartAssignedName ? `🚗 ${b.cartAssignedName}` : ''} {b.ipadNumbers ? (<span className="block mt-0.5 bg-slate-100 p-1 rounded font-mono inline-block">📱 {b.ipadNumbers}</span>) : ''}</div>
+                                        <td className="px-4 py-3 text-xs">
+                                            {b.status === 'assigned' && (<span className="text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-200">✅ 已分配</span>)}
+                                            {b.status === 'rejected' && (<span className="text-red-500 font-bold bg-red-50 px-2 py-1 rounded border border-red-200">❌ 已退回</span>)}
+                                            {b.status === 'cancelled' && (<span className="text-slate-500 font-bold bg-slate-100 px-2 py-1 rounded border border-slate-200">⛔ 已取消</span>)}
+                                            <div className="mt-2 text-slate-600 font-medium">{b.cartAssignedName ? `🚗 ${b.cartAssignedName}` : ''} {b.ipadNumbers ? (<><br/>📱 {b.ipadNumbers}</>) : ''}</div>
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             <button onClick={() => openEdit('bookings', b.id)} className="text-sky-600 text-xs font-bold hover:underline bg-sky-50 px-3 py-1.5 rounded border border-sky-200 shadow-sm transition-colors">✏️ 編輯</button>
@@ -1731,12 +1769,25 @@ function AdminDisplay({ db, api, showAlert }) {
         setDraggedIdx(null);
     };
 
+    // 💡 處理直接輸入數字改變排序的邏輯
+    const handleOrderChange = (oldIndex, newOrderStr) => {
+        let newIndex = parseInt(newOrderStr, 10) - 1;
+        const arr = [...localOrder];
+        if (isNaN(newIndex) || newIndex < 0) newIndex = 0;
+        if (newIndex >= arr.length) newIndex = arr.length - 1;
+        if (newIndex === oldIndex) return; 
+
+        const item = arr.splice(oldIndex, 1)[0];
+        arr.splice(newIndex, 0, item);
+        setLocalOrder(arr);
+    };
+
     const labelMap = {teacher:'教師姓名', className:'班級名稱', observation:'觀課提醒', ipadNumbers:'iPad編號', pickupMethod:'取機方式', itSupport:'IT協助', remarks:'備註說明'};
 
     return (
         <div className="bg-white p-6 md:p-8 rounded-3xl border shadow-sm animate-fade-in">
             <h3 className="text-2xl font-extrabold mb-6 text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-2"><Settings className="text-sky-600" /> 總覽表顯示項目</h3>
-            <p className="text-sm text-slate-500 mb-6">自訂前台「每日充電車時間表」格子內呈現的資訊與順序 <span className="text-sky-600 font-bold">(可拖拉 ☰ 排序)</span>：</p>
+            <p className="text-sm text-slate-500 mb-6">自訂前台「每日充電車時間表」格子內呈現的資訊與順序 <span className="text-sky-600 font-bold">(可直接輸入數字或拖拉 ☰ 排序)</span>：</p>
             <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8 bg-slate-50 p-4 rounded-2xl border border-slate-200">
                 {localOrder.map((key, idx) => (
                     <li key={key} 
@@ -1744,12 +1795,15 @@ function AdminDisplay({ db, api, showAlert }) {
                         onDragStart={() => setDraggedIdx(idx)} 
                         onDragOver={e => e.preventDefault()} 
                         onDrop={e => handleDrop(e, idx)}
-                        className="flex items-center space-x-3 bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm hover:border-sky-300 transition-colors cursor-grab active:cursor-grabbing">
-                        <div className="text-slate-400 text-lg mr-2">☰</div>
-                        <label className="flex items-center space-x-3 cursor-pointer font-bold text-slate-700 w-full">
-                            <input type="checkbox" checked={localDs[key] || false} onChange={(e) => setLocalDs({...localDs, [key]: e.target.checked})} className="accent-sky-600 w-4 h-4" /> 
-                            <span>{labelMap[key]}</span>
-                        </label>
+                        className="flex items-center justify-between space-x-3 bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm hover:border-sky-300 cursor-grab active:cursor-grabbing">
+                        <div className="flex items-center w-full">
+                            <div className="text-slate-400 text-lg mr-2">☰</div>
+                            <input type="number" min="1" max={localOrder.length} value={idx + 1} onChange={(e) => handleOrderChange(idx, e.target.value)} className="w-12 px-1 py-1 mr-3 text-center border border-slate-300 rounded text-sm outline-none focus:border-sky-500" />
+                            <label className="flex items-center space-x-3 cursor-pointer font-bold text-slate-700 w-full">
+                                <input type="checkbox" checked={localDs[key] || false} onChange={(e) => setLocalDs({...localDs, [key]: e.target.checked})} className="accent-sky-600 w-4 h-4" /> 
+                                <span>{labelMap[key]}</span>
+                            </label>
+                        </div>
                     </li>
                 ))}
             </ul>
@@ -1777,6 +1831,18 @@ function AdminTimeSlots({ db, api, showAlert, showConfirm, openEdit }) {
         const item = newArr.splice(draggedIdx, 1)[0];
         newArr.splice(dropIndex, 0, item);
         try { await api.adminSaveSettings({ ...db, timeSlots: newArr }); setDraggedIdx(null); } catch(e){}
+    };
+
+    const handleOrderChange = async (oldIndex, newOrderStr) => {
+        let newIndex = parseInt(newOrderStr, 10) - 1;
+        const arr = [...db.timeSlots];
+        if (isNaN(newIndex) || newIndex < 0) newIndex = 0;
+        if (newIndex >= arr.length) newIndex = arr.length - 1;
+        if (newIndex === oldIndex) return;
+
+        const item = arr.splice(oldIndex, 1)[0];
+        arr.splice(newIndex, 0, item);
+        try { await api.adminSaveSettings({ ...db, timeSlots: arr }); } catch(e){}
     };
 
     return (
@@ -1815,7 +1881,10 @@ function AdminTimeSlots({ db, api, showAlert, showConfirm, openEdit }) {
                         onDrop={e => handleDrop(e, i)}
                         className="p-4 border border-slate-200 rounded-2xl bg-white shadow-sm flex justify-between items-center hover:border-sky-300 transition-colors cursor-grab active:cursor-grabbing">
                         <div className="flex items-center w-full">
-                            <div className="text-slate-400 mr-4 text-lg">☰</div>
+                            <div className="flex items-center mr-4">
+                                <div className="text-slate-400 text-lg mr-2 cursor-grab">☰</div>
+                                <input type="number" min="1" max={db.timeSlots.length} value={i + 1} onChange={(e) => handleOrderChange(i, e.target.value)} className="w-12 px-1 py-1 text-center border border-slate-300 rounded text-sm outline-none focus:border-sky-500" />
+                            </div>
                             <div>
                                 <div className="font-extrabold text-lg text-slate-800">{s.name} <span className="text-sm font-normal text-slate-500 ml-2">{s.timeRange}</span> <span className="text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full ml-2">名額:{s.quota}</span></div>
                                 <div className="text-xs text-slate-500 mt-1.5 flex items-center gap-2">
@@ -1855,6 +1924,18 @@ function AdminClasses({ db, api, showAlert, showConfirm, openEdit }) {
         try { await api.adminSaveSettings({ ...db, classes: newArr }); setDraggedIdx(null); } catch(e){}
     };
 
+    const handleOrderChange = async (oldIndex, newOrderStr) => {
+        let newIndex = parseInt(newOrderStr, 10) - 1;
+        const arr = [...db.classes];
+        if (isNaN(newIndex) || newIndex < 0) newIndex = 0;
+        if (newIndex >= arr.length) newIndex = arr.length - 1;
+        if (newIndex === oldIndex) return;
+
+        const item = arr.splice(oldIndex, 1)[0];
+        arr.splice(newIndex, 0, item);
+        try { await api.adminSaveSettings({ ...db, classes: arr }); } catch(e){}
+    };
+
     return (
         <div className="bg-white p-6 md:p-8 rounded-3xl border shadow-sm animate-fade-in">
             <h3 className="text-2xl font-extrabold mb-6 text-slate-800 border-b border-slate-100 pb-3">🏫 班級與人數</h3>
@@ -1871,8 +1952,11 @@ function AdminClasses({ db, api, showAlert, showConfirm, openEdit }) {
                         onDragOver={e => e.preventDefault()} 
                         onDrop={e => handleDrop(e, i)}
                         className="p-4 border border-slate-200 rounded-xl flex justify-between items-center shadow-sm bg-white hover:border-sky-300 cursor-grab active:cursor-grabbing">
-                        <div className="flex items-center">
-                            <div className="text-slate-400 mr-3 text-lg">☰</div>
+                        <div className="flex items-center w-full">
+                            <div className="flex items-center mr-4">
+                                <div className="text-slate-400 text-lg mr-2 cursor-grab">☰</div>
+                                <input type="number" min="1" max={db.classes.length} value={i + 1} onChange={(e) => handleOrderChange(i, e.target.value)} className="w-12 px-1 py-1 text-center border border-slate-300 rounded text-sm outline-none focus:border-sky-500" />
+                            </div>
                             <div className="font-bold text-slate-700">{c.name} <span className="text-xs text-slate-400 font-normal ml-1">({c.limit}人)</span></div>
                         </div>
                         <div className="space-x-2">
@@ -1906,6 +1990,18 @@ function AdminCarts({ db, api, showAlert, showConfirm, openEdit }) {
         try { await api.adminSaveSettings({ ...db, carts: newArr }); setDraggedIdx(null); } catch(e){}
     };
 
+    const handleOrderChange = async (oldIndex, newOrderStr) => {
+        let newIndex = parseInt(newOrderStr, 10) - 1;
+        const arr = [...db.carts];
+        if (isNaN(newIndex) || newIndex < 0) newIndex = 0;
+        if (newIndex >= arr.length) newIndex = arr.length - 1;
+        if (newIndex === oldIndex) return;
+
+        const item = arr.splice(oldIndex, 1)[0];
+        arr.splice(newIndex, 0, item);
+        try { await api.adminSaveSettings({ ...db, carts: arr }); } catch(e){}
+    };
+
     return (
         <div className="bg-white p-6 md:p-8 rounded-3xl border shadow-sm animate-fade-in">
             <h3 className="text-2xl font-extrabold mb-6 text-slate-800 border-b border-slate-100 pb-3">🔋 充電車設備</h3>
@@ -1922,8 +2018,11 @@ function AdminCarts({ db, api, showAlert, showConfirm, openEdit }) {
                         onDragOver={e => e.preventDefault()} 
                         onDrop={e => handleDrop(e, i)}
                         className="p-4 border border-slate-200 rounded-xl flex justify-between items-center shadow-sm bg-white hover:border-sky-300 cursor-grab active:cursor-grabbing">
-                        <div className="flex items-center">
-                            <div className="text-slate-400 mr-3 text-lg">☰</div>
+                        <div className="flex items-center w-full">
+                            <div className="flex items-center mr-4">
+                                <div className="text-slate-400 text-lg mr-2 cursor-grab">☰</div>
+                                <input type="number" min="1" max={db.carts.length} value={i + 1} onChange={(e) => handleOrderChange(i, e.target.value)} className="w-12 px-1 py-1 text-center border border-slate-300 rounded text-sm outline-none focus:border-sky-500" />
+                            </div>
                             <div className="font-extrabold text-lg text-slate-800">{c.name} <span className="text-sm font-normal text-slate-500 ml-2">({c.capacity}台)</span></div>
                         </div>
                         <div className="space-x-2">
@@ -1960,6 +2059,18 @@ function AdminPickups({ db, api, showAlert, showConfirm, openEdit }) {
         try { await api.adminSaveSettings({ ...db, pickupMethods: newArr }); setDraggedIdx(null); } catch(e){}
     };
 
+    const handleOrderChange = async (oldIndex, newOrderStr) => {
+        let newIndex = parseInt(newOrderStr, 10) - 1;
+        const arr = [...db.pickupMethods];
+        if (isNaN(newIndex) || newIndex < 0) newIndex = 0;
+        if (newIndex >= arr.length) newIndex = arr.length - 1;
+        if (newIndex === oldIndex) return;
+
+        const item = arr.splice(oldIndex, 1)[0];
+        arr.splice(newIndex, 0, item);
+        try { await api.adminSaveSettings({ ...db, pickupMethods: arr }); } catch(e){}
+    };
+
     return (
         <div className="bg-white p-6 md:p-8 rounded-3xl border shadow-sm animate-fade-in">
             <h3 className="text-2xl font-extrabold mb-6 text-slate-800 border-b border-slate-100 pb-3">📦 取機方式</h3>
@@ -1975,11 +2086,14 @@ function AdminPickups({ db, api, showAlert, showConfirm, openEdit }) {
                         onDragOver={e => e.preventDefault()} 
                         onDrop={e => handleDrop(e, i)}
                         className="p-3.5 border border-slate-200 rounded-xl flex justify-between items-center shadow-sm bg-white hover:border-sky-300 cursor-grab active:cursor-grabbing">
-                        <div className="flex items-center">
-                            <div className="text-slate-400 mr-3 text-lg">☰</div>
+                        <div className="flex items-center w-full">
+                            <div className="flex items-center mr-4">
+                                <div className="text-slate-400 text-lg mr-2 cursor-grab">☰</div>
+                                <input type="number" min="1" max={db.pickupMethods.length} value={i + 1} onChange={(e) => handleOrderChange(i, e.target.value)} className="w-12 px-1 py-1 text-center border border-slate-300 rounded text-sm outline-none focus:border-sky-500" />
+                            </div>
                             <div className="font-bold text-slate-700">{p.name}</div>
                         </div>
-                        <div className="space-x-2">
+                        <div className="space-x-2 flex-shrink-0">
                             <button onClick={() => openEdit('pickupMethods', i)} className="text-sky-600 text-xs font-bold hover:underline bg-sky-50 px-2 py-1 rounded border border-sky-200">編輯</button>
                             <button onClick={() => handleDel(i)} className="text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
                         </div>
