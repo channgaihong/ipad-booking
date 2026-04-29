@@ -15,7 +15,6 @@ const doubleQuote = quoteChar + quoteChar;
 const API_URL = ["https:", "", "script.google.com", "macros", "s", "AKfycbwoEBK86I5vvf6RScyYNxLGOIVz9SbuFLARCQ-LhzsjvthkMrHwx7unVLfA97LeuQw", "exec"].join(slashChar);
 
 const dayMap = { 0: '日', 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六' };
-// 💡 更新預設排序
 const DEFAULT_DISPLAY_ORDER = ['observation', 'teacher', 'className', 'pickupMethod', 'itSupport', 'ipadNumbers', 'remarks'];
 
 const DateUtils = {
@@ -229,7 +228,6 @@ export default function App() {
                 }
               }, (error) => {
                  console.error("Firestore snapshot error:", error);
-                 // Fallback on error if permissions fail
               });
             }
           });
@@ -256,14 +254,9 @@ export default function App() {
       }
     };
     initData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ==========================================
-  // 🛡️ API 寫入通道 (防止 Race Condition)
-  // ==========================================
   const api = {
-    // 1. 一般老師新增預約
     addBookings: async (newBookings, usedCodesPayload) => {
       setLoading(true);
       try {
@@ -297,12 +290,10 @@ export default function App() {
         setDb(updatedDB); 
         return true;
       } catch (e) {
-        console.error(e);
-        throw e;
+        console.error(e); throw e;
       } finally { setLoading(false); }
     },
 
-    // 2. 取消預約 (單筆更新)
     cancelBooking: async (bookingId) => {
       setLoading(true);
       try {
@@ -328,12 +319,10 @@ export default function App() {
         setDb(updatedDB);
         return true;
       } catch (e) {
-        console.error(e);
-        throw e;
+        console.error(e); throw e;
       } finally { setLoading(false); }
     },
 
-    // 3. 管理員儲存系統設定 (不更動預約紀錄)
     adminSaveSettings: async (newDbConfig) => {
       setLoading(true);
       try {
@@ -355,12 +344,10 @@ export default function App() {
         setDb(newDbConfig);
         return true;
       } catch (e) {
-        console.error(e);
-        throw e;
+        console.error(e); throw e;
       } finally { setLoading(false); }
     },
 
-    // 4. 管理員更新/核准多筆預約狀態 (防覆寫)
     adminUpdateBookings: async (updatedBookingsArray) => {
       setLoading(true);
       try {
@@ -388,12 +375,10 @@ export default function App() {
         setDb(newDb);
         return true;
       } catch (e) {
-        console.error(e);
-        throw e;
+        console.error(e); throw e;
       } finally { setLoading(false); }
     },
 
-    // 5. 強制全域覆寫 (清空資料或還原備份使用)
     adminOverwriteAll: async (newDbConfig) => {
       setLoading(true);
       try {
@@ -415,8 +400,7 @@ export default function App() {
         setDb(newDbConfig);
         return true;
       } catch (e) {
-        console.error(e);
-        throw e;
+        console.error(e); throw e;
       } finally { setLoading(false); }
     }
   };
@@ -592,7 +576,6 @@ function PrintOverlay({ db, printData, onClose }) {
         </div>
       </div>
       
-      {/* 加上 print:p-0 print:m-0 確保列印模式沒有外層間距 */}
       <div className="p-4 sm:p-8 space-y-8 print:p-0 print:space-y-0 print:block flex flex-col items-center">
         {cartsToPrint.map((cart, idx) => {
            const cartBookings = dayBookings.filter(x => x.cartAssignedId == cart.id);
@@ -601,7 +584,7 @@ function PrintOverlay({ db, printData, onClose }) {
                   key={cart.id} 
                   className={`a5-container p-6 bg-white border-2 border-slate-800 rounded-2xl shadow-xl w-full max-w-[210mm] print:max-w-none print:p-0 print:mb-0 print:rounded-none print:shadow-none ${idx !== cartsToPrint.length - 1 ? 'page-break-after' : ''}`}
               >
-                <div className="flex justify-between items-end border-b-2 border-slate-400 pb-1 mb-2">
+                <div className="flex justify-between items-end border-b border-slate-400 pb-1 mb-2">
                   <div className="flex items-center space-x-2">
                     <div className="w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center text-white text-xl">📱</div>
                     <div>
@@ -609,9 +592,8 @@ function PrintOverlay({ db, printData, onClose }) {
                       <p className="text-xs text-slate-600">{DateUtils.toChineseDate(date)}</p>
                     </div>
                   </div>
-                  <div className="text-right"><p className="text-lg font-bold text-slate-700">iPad 借用登記表</p></div>
+                  <div className="text-right"><p className="text-base font-bold text-slate-700">iPad 借用登記表</p></div>
                 </div>
-                {/* 內部表格字體縮小以防撐破版面 */}
                 <table className="w-full border-collapse border border-slate-800 text-[11px] sm:text-xs text-center">
                   <thead>
                     <tr className="bg-slate-100">
@@ -640,13 +622,13 @@ function PrintOverlay({ db, printData, onClose }) {
                           <td className="border border-slate-800">{b.className}</td>
                           <td className="border border-slate-800 font-bold">{b.peopleCount}</td>
                           <td className="border border-slate-800">{b.pickupMethod || ''}</td>
-                          <td className="border border-slate-800 text-[10px] break-words max-w-[150px] p-0.5 leading-tight">{b.ipadNumbers || ''}</td>
-                          <td className="border border-slate-800 text-left px-1 text-[10px] truncate max-w-[100px]">{b.remarks || ''}</td>
+                          <td className="border border-slate-800 text-[9px] break-words whitespace-pre-wrap max-w-[150px] p-0.5 leading-tight">{b.ipadNumbers || ''}</td>
+                          <td className="border border-slate-800 text-left px-1 text-[9px] whitespace-pre-wrap break-words">{b.remarks || ''}</td>
                         </tr>
                       ));
                     })}
                     {cartBookings.length === 0 && (
-                      <tr><td colSpan="8" className="border border-slate-800 p-4 text-center text-slate-500 font-bold">本日該車無分配紀錄</td></tr>
+                      <tr><td colSpan="8" className="border border-slate-800 p-3 text-center text-slate-500 font-bold">本日該車無分配紀錄</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -672,14 +654,13 @@ function SchedulePage({ db }) {
 
   return (
     <div className="animate-fade-in">
-      <div className="bg-white p-5 sm:p-6 rounded-2xl border shadow-sm">
+      <div className="bg-white p-5 sm:p-6 rounded-2xl border shadow-sm mt-2">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
           <h2 className="text-xl font-bold flex items-center text-slate-800"><CalendarIcon className="w-5 h-5 mr-2 text-sky-600" /> 每日充電車時間表</h2>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="px-4 py-2 border rounded-lg font-bold outline-none focus:ring-2 focus:ring-sky-400 bg-slate-50" />
         </div>
         
         <div className="overflow-x-auto custom-scrollbar pb-2">
-          {/* 加入 table-fixed 強制平分寬度 */}
           <table className="w-full table-fixed text-sm text-center border-collapse min-w-[800px]">
             <thead className="bg-slate-100 text-slate-600">
               <tr>
@@ -694,7 +675,7 @@ function SchedulePage({ db }) {
                 validSlots.map(slot => (
                   <tr key={slot.id} className="hover:bg-slate-50 border-b last:border-0">
                     <td className="p-3 font-bold text-center border-r bg-white sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
-                      {slot.name} <span className="text-xs text-slate-400 block font-normal mt-1">{slot.timeRange}</span>
+                      {slot.name} <span className="text-[10px] sm:text-xs text-slate-400 block font-normal mt-1">{slot.timeRange}</span>
                     </td>
                     {db.carts.map(cart => {
                       const bList = dayBookings.filter(x => x.cartAssignedId == cart.id && x.timeSlot === slot.name);
@@ -807,13 +788,29 @@ function BookingPage({ db, api, showAlert, showConfirm }) {
     });
   };
 
+  const handleDateChange = (dStr) => {
+      setForm({...formData, singleDate: dStr});
+      if (dStr) {
+          const maxD = calculateMaxDate(db);
+          if (dStr > maxD) return;
+          const hol = checkIsHoliday(dStr, db);
+          if (hol) {
+              showAlert(`❌ 錯誤：日期 ${dStr} 為停借日 (${hol.remark})，系統不允許預約！`, "錯誤", "❌");
+              setForm(p => ({...p, singleDate: ''}));
+          }
+      }
+  };
+
   const handleAddBatchDate = () => {
     const d = tempBatchDate;
     if (!d) return;
     if (d > maxDate) return showAlert(`超出可預約範圍 (最遠至 ${maxDate})`);
     if (d < minAllowedDate) return showAlert("該日期需要開啟緊急預約");
     const hol = checkIsHoliday(d, db);
-    if (hol) return showAlert(`停借日: ${hol.remark}`);
+    if (hol) {
+        showAlert(`❌ 錯誤：日期 ${d} 為停借日 (${hol.remark})，系統不允許預約！`, "錯誤", "❌");
+        return;
+    }
     if (!formData.batchDates.includes(d)) {
       setForm(p => ({...p, batchDates: [...p.batchDates, d]}));
       setTempBatchDate('');
@@ -843,7 +840,7 @@ function BookingPage({ db, api, showAlert, showConfirm }) {
     }
     
     if(addedCount === 0) { 
-      showAlert("⚠️ 範圍內無有效工作日。", "提示", "⚠️"); 
+      showAlert("⚠️ 範圍內無有效工作日 (可能皆為假日或停借日)。", "提示", "⚠️"); 
     } else {
       setForm(p => ({...p, batchDates: newDates}));
     }
@@ -872,6 +869,9 @@ function BookingPage({ db, api, showAlert, showConfirm }) {
           if (detail.people > classLimit) return showAlert(`${slotName} 人數超出班級上限(${classLimit})`);
 
           for (let d of dates) {
+              const hol = checkIsHoliday(d, db);
+              if (hol) return showAlert(`❌ 錯誤：日期 ${d} 為停借日 (${hol.remark})，系統不允許預約！`, "錯誤", "❌");
+
               if (db.bookings.some(b => b.date === d && b.timeSlot === slotName && b.className === detail.class && b.status !== 'cancelled' && b.status !== 'rejected')) {
                   return showAlert(`日期 ${d} 的 [${slotName}] 班級【${detail.class}】已有紀錄，無法重複預約！`);
               }
@@ -885,7 +885,6 @@ function BookingPage({ db, api, showAlert, showConfirm }) {
       }
 
       try {
-          // 使用獨立的 API 通道，確保不覆寫別人的資料
           await api.addBookings(newBookings, usedCodesPayload);
           showAlert(`✅ 預約已送出！共建立 ${newBookings.length} 筆預約。`, "成功", "🎉");
           setForm({ teacher: '', mode: 'single', singleDate: '', batchDates: [], pickup: '送到課室', it: '否', obs: '否', remarks: '', authCode: '', isUrgent: false });
@@ -911,7 +910,7 @@ function BookingPage({ db, api, showAlert, showConfirm }) {
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in">
         {/* 表單區塊 */}
         <div className="bg-white p-6 md:p-8 rounded-2xl border shadow-lg lg:col-span-5">
-            <h2 className="text-2xl font-extrabold mb-6 flex items-center"><ClipboardList className="w-6 h-6 mr-2 text-sky-600" /> 新建預約申請</h2>
+            <h2 className="text-xl sm:text-2xl font-extrabold mb-4 flex items-center"><ClipboardList className="w-6 h-6 mr-2 text-sky-600" /> 新建預約申請</h2>
             <div className="space-y-5">
                 <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">教師姓名 <span className="text-red-500">*</span></label>
@@ -940,14 +939,7 @@ function BookingPage({ db, api, showAlert, showConfirm }) {
                         </label>
                     </div>
                     {formData.mode === 'single' ? (
-                        <input type="date" min={minAllowedDate} max={maxDate} value={formData.singleDate} onChange={(e) => {
-                            const dStr = e.target.value;
-                            setForm({...formData, singleDate: dStr});
-                            if (dStr) {
-                                const hol = checkIsHoliday(dStr, db);
-                                if (hol) showAlert(`⚠️ 停借日: ${hol.remark}`);
-                            }
-                        }} className="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-sky-400" />
+                        <input type="date" min={minAllowedDate} max={maxDate} value={formData.singleDate} onChange={(e) => handleDateChange(e.target.value)} className="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-sky-400" />
                     ) : (
                         <div>
                             <div className="flex space-x-3 mb-3">
@@ -1069,7 +1061,7 @@ function BookingPage({ db, api, showAlert, showConfirm }) {
                                   {b.observation === '是' && (<span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded ml-1 font-bold">觀課</span>)}
                                 </div>
                                 <div className="text-sm text-slate-500 mt-1 font-medium flex items-center gap-1.5"><CalendarIcon className="w-3.5 h-3.5" /> {b.date} <Clock className="w-3.5 h-3.5 ml-1" /> {b.timeSlot}</div>
-                                {b.remarks && (<div className="text-[11px] text-sky-700 mt-2 bg-sky-50 px-2 py-1 rounded block w-full whitespace-pre-line break-words">備註: {b.remarks}</div>)}
+                                {b.remarks && (<div className="text-[11px] text-sky-700 mt-2 bg-sky-50 px-2 py-1 rounded block w-full whitespace-pre-wrap break-words">備註: {b.remarks}</div>)}
                             </div>
                             <div className="text-right flex flex-col items-start sm:items-end gap-2 w-full sm:w-auto bg-slate-50 sm:bg-transparent p-3 sm:p-0 rounded-lg">
                                 {b.status === 'assigned' && (<span className="text-emerald-600 font-extrabold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-sm flex items-center gap-1">✅ {b.cartAssignedName} <span className="text-xs font-normal text-emerald-700 block ml-1">{b.ipadNumbers && (`📱${b.ipadNumbers}`)}</span></span>)}
@@ -1434,6 +1426,7 @@ function AdminPanel({ db, api, subPage, setSubPage, onLogout, showAlert, showCon
                               <div><label className="block text-xs font-bold text-slate-700 mb-1">時間範圍</label><input type="text" value={editModal.data.timeRange} onChange={e=>setEditModal(p=>({...p, data:{...p.data, timeRange: e.target.value}}))} className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-400" /></div>
                               <div><label className="block text-xs font-bold text-slate-700 mb-1">名額</label><input type="number" value={editModal.data.quota} onChange={e=>setEditModal(p=>({...p, data:{...p.data, quota: parseInt(e.target.value, 10)}}))} className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-400" /></div>
                               <div><label className="block text-xs font-bold text-slate-700 mb-1">備註</label><textarea value={editModal.data.remark || ''} onChange={e=>setEditModal(p=>({...p, data:{...p.data, remark: e.target.value}}))} className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-400" rows={2}></textarea></div>
+                              <div><label className="flex items-center text-sm font-bold text-slate-600"><input type="checkbox" checked={editModal.data.showRemark || false} onChange={e=>setEditModal(p=>({...p, data:{...p.data, showRemark: e.target.checked}}))} className="mr-2" /> 顯示備註於預約表單中</label></div>
                           </>
                       )}
                       {editModal.type === 'classes' && (
@@ -1619,21 +1612,21 @@ function AdminAssign({ db, api, showAlert, showConfirm, setPrintData, openEdit }
                             <tbody>
                                 {pending.map(b => (
                                     <tr key={b.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                                        <td className="px-4 py-4">
-                                            <div className="font-bold text-slate-800">{b.date} <span className="text-slate-500 font-normal">| {b.timeSlot}</span></div>
-                                            <div className="mt-1 font-bold text-sky-700">
+                                        <td className="px-4 py-4 whitespace-nowrap">
+                                            <div className="font-bold text-slate-800">{b.date}</div><div className="text-slate-500">{b.timeSlot}</div>
+                                            <div className="mt-2 font-bold text-sky-700">
                                               {b.teacher} 
                                               <span className="text-xs bg-sky-100 px-1.5 py-0.5 rounded text-sky-800 ml-1">{b.className} ({b.peopleCount}人)</span> 
                                               {b.observation === '是' && (<span className="text-[10px] bg-red-100 text-red-600 px-1 py-0.5 rounded ml-1 font-bold">觀課</span>)}
                                             </div>
-                                            {b.remarks && (<div className="mt-1.5 text-[11px] text-slate-500 italic bg-slate-100 p-1.5 rounded border border-slate-200 block w-full whitespace-pre-line break-words">備註: {b.remarks}</div>)}
+                                            {b.remarks && (<div className="mt-1.5 text-xs text-slate-500 italic bg-slate-100 p-1.5 rounded border border-slate-200 whitespace-pre-wrap break-words">備註: {b.remarks}</div>)}
                                         </td>
                                         <td className="px-4 py-4 space-y-2">
                                             <select value={getPendingVal(b.id, 'cart', '')} onChange={(e) => updatePending(b.id, 'cart', e.target.value)} className="w-full text-sm border border-slate-200 rounded-lg py-2 px-2 outline-none focus:ring-2 focus:ring-sky-400 bg-white font-bold text-slate-700"><option value="">--選擇車輛--</option>{db.carts.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
                                             <select value={getPendingVal(b.id, 'pickup', b.pickupMethod)} onChange={(e) => updatePending(b.id, 'pickup', e.target.value)} className="w-full text-xs border border-slate-200 rounded-lg py-1.5 px-2 outline-none focus:ring-2 focus:ring-sky-400 bg-slate-50 text-slate-600">{db.pickupMethods.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}</select>
                                         </td>
                                         <td className="px-4 py-4">
-                                            <div className="flex shadow-sm rounded-lg">
+                                            <div className="flex shadow-sm rounded-lg w-full">
                                                 <input type="text" value={getPendingVal(b.id, 'ipad', '')} onChange={(e) => updatePending(b.id, 'ipad', e.target.value)} className="w-full text-sm border border-slate-200 border-r-0 rounded-l-lg p-2 outline-none focus:ring-2 focus:ring-sky-400 font-mono" placeholder="例: 1-15" />
                                                 <button onClick={() => {
                                                     const cid = getPendingVal(b.id, 'cart', '');
@@ -1670,14 +1663,14 @@ function AdminAssign({ db, api, showAlert, showConfirm, setPrintData, openEdit }
                             ) : (
                                 processed.map(b => (
                                     <tr key={b.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                                        <td className="px-4 py-3 text-xs text-slate-600"><b>{b.date}</b><br />{b.timeSlot}</td>
+                                        <td className="px-4 py-3 text-xs whitespace-nowrap"><b>{b.date}</b><br />{b.timeSlot}</td>
                                         <td className="px-4 py-3 text-xs">
                                             <b>{b.teacher}</b><br /><span className="text-slate-500">{b.className} ({b.peopleCount}人)</span>
                                             <div className="flex flex-wrap gap-1 mt-1.5">
                                                 {b.observation === '是' && <span className="text-[10px] text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded font-bold">觀課</span>}
                                                 {b.itSupport === '是' && <span className="text-[10px] text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded font-bold">需IT</span>}
                                             </div>
-                                            {b.remarks && <div className="mt-1.5 text-[11px] text-sky-700 bg-sky-50 border border-sky-100 px-2 py-1 rounded block w-full whitespace-pre-line break-words">備註: {b.remarks}</div>}
+                                            {b.remarks && <div className="mt-1.5 text-[11px] text-sky-700 bg-sky-50 border border-sky-100 px-2 py-1 rounded block w-full whitespace-pre-wrap break-words">備註: {b.remarks}</div>}
                                         </td>
                                         <td className="px-4 py-3 text-xs">
                                             {b.status === 'assigned' && (<span className="text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-200">✅ 已分配</span>)}
@@ -1705,7 +1698,7 @@ function AdminAssign({ db, api, showAlert, showConfirm, setPrintData, openEdit }
                             <span className="text-sm font-bold text-sky-600 bg-sky-50 px-3 py-1 rounded-full border border-sky-100">已選: {ipadModal.selectedIpads.length}</span>
                         </h3>
                         <div className="max-h-[50vh] overflow-y-auto mb-4 custom-scrollbar pr-2 mt-4">
-                            <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
+                            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 w-full">
                                 {Array.from({length: db.carts.find(c=>c.id==ipadModal.cartId)?.capacity || 30}).map((_, i) => {
                                     const numStr = (i+1).toString();
                                     const cart = db.carts.find(c=>c.id==ipadModal.cartId);
@@ -1717,13 +1710,13 @@ function AdminAssign({ db, api, showAlert, showConfirm, setPrintData, openEdit }
                                     const isUsed = used.includes(numStr);
                                     const isSelected = ipadModal.selectedIpads.includes(numStr);
 
-                                    if (isDamaged) return (<div key={i} className="aspect-square border rounded-xl bg-red-50 text-red-400 flex items-center justify-center text-xs font-bold border-red-200 line-through">壞</div>);
-                                    if (isUsed) return (<div key={i} className="aspect-square border rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center text-xs font-bold border-slate-200 cursor-not-allowed">{numStr}</div>);
+                                    if (isDamaged) return (<div key={i} className="aspect-square p-1 sm:p-2 border rounded bg-red-100 text-red-500 flex items-center justify-center text-xs font-bold border-red-200 line-through">壞</div>);
+                                    if (isUsed) return (<div key={i} className="aspect-square p-1 sm:p-2 border rounded bg-slate-100 text-slate-400 flex items-center justify-center text-xs font-bold border-slate-200 cursor-not-allowed">{numStr}</div>);
                                     
                                     return (
                                         <button key={i} onClick={() => {
                                             setIpadModal(p => ({...p, selectedIpads: p.selectedIpads.includes(numStr) ? p.selectedIpads.filter(x=>x!==numStr) : [...p.selectedIpads, numStr]}));
-                                        }} className={`aspect-square border rounded-xl flex items-center justify-center text-sm font-extrabold transition-all transform hover:scale-105 shadow-sm ${isSelected ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-sky-600 border-sky-200 hover:bg-sky-50'}`}>{numStr}</button>
+                                        }} className={`aspect-square p-1 sm:p-2 border rounded flex items-center justify-center text-xs sm:text-sm font-extrabold transition-all transform hover:scale-105 shadow-sm ${isSelected ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-sky-600 border-sky-200 hover:bg-sky-50'}`}>{numStr}</button>
                                     );
                                 })}
                             </div>
@@ -1769,7 +1762,6 @@ function AdminDisplay({ db, api, showAlert }) {
         setDraggedIdx(null);
     };
 
-    // 💡 處理直接輸入數字改變排序的邏輯
     const handleOrderChange = (oldIndex, newOrderStr) => {
         let newIndex = parseInt(newOrderStr, 10) - 1;
         const arr = [...localOrder];
@@ -1889,7 +1881,7 @@ function AdminTimeSlots({ db, api, showAlert, showConfirm, openEdit }) {
                                 <div className="font-extrabold text-lg text-slate-800">{s.name} <span className="text-sm font-normal text-slate-500 ml-2">{s.timeRange}</span> <span className="text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full ml-2">名額:{s.quota}</span></div>
                                 <div className="text-xs text-slate-500 mt-1.5 flex items-center gap-2">
                                     <span className="bg-slate-100 px-1.5 rounded text-slate-600">星期 {s.applicableDays?.map(d=>dayMap[d]).join(',')}</span>
-                                    {s.remark && (<span className="italic">備註: {s.remark} ({s.showRemark?'顯示':'隱藏'})</span>)}
+                                    {s.remark && (<span className="italic">備註: {s.remark} <span className="font-bold text-sky-600">{s.showRemark?'(顯示)':'(不顯示)'}</span></span>)}
                                 </div>
                             </div>
                         </div>
