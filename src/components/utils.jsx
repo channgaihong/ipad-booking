@@ -1,11 +1,11 @@
 // ==========================================
 // ⚙️ 全域設定與工具函式
 // ==========================================
-const slashChar = String.fromCharCode(47);
-const quoteChar = String.fromCharCode(34);
-const doubleQuote = quoteChar + quoteChar;
+export const slashChar = String.fromCharCode(47);
+export const quoteChar = String.fromCharCode(34);
+export const doubleQuote = quoteChar + quoteChar;
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
@@ -14,18 +14,18 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-const API_URL = import.meta.env.VITE_API_URL;
+export const API_URL = import.meta.env.VITE_API_URL;
 
 // 初始化 Firebase
-const app = initializeApp(firebaseConfig);
-const db_firestore = getFirestore(app);
+export const app = initializeApp(firebaseConfig);
+export const db_firestore = getFirestore(app);
 
 // const API_URL = ["https:", "", "script.google.com", "macros", "s", "AKfycbwoEBK86I5vvf6RScyYNxLGOIVz9SbuFLARCQ-LhzsjvthkMrHwx7unVLfA97LeuQw", "exec"].join(slashChar);
 
-const dayMap = { 0: '日', 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六' };
-const DEFAULT_DISPLAY_ORDER = ['observation', 'teacher', 'className', 'pickupMethod', 'itSupport', 'ipadNumbers', 'remarks'];
+export const dayMap = { 0: '日', 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六' };
+export const DEFAULT_DISPLAY_ORDER = ['observation', 'teacher', 'className', 'pickupMethod', 'itSupport', 'ipadNumbers', 'remarks'];
 
-const DateUtils = {
+export const DateUtils = {
   today: () => new Date(),
   toISODate: (date) => {
     const d = new Date(date);
@@ -38,14 +38,14 @@ const DateUtils = {
   }
 };
 
-const hashPassword = async (message) => {
+export const hashPassword = async (message) => {
   const msgBuffer = new TextEncoder().encode(message);
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-const parseTimeRange = (rangeStr) => {
+export const parseTimeRange = (rangeStr) => {
   if (!rangeStr) return null;
   const matches = rangeStr.match(new RegExp('(\\d{1,2})[:：](\\d{2})\\s*[-~至]\\s*(\\d{1,2})[:：](\\d{2})'));
   if (matches) {
@@ -59,7 +59,7 @@ const parseTimeRange = (rangeStr) => {
 
 const checkOverlap = (r1, r2) => r1 && r2 && (r1.start < r2.end && r2.start < r1.end);
 
-const getOverlappingSlots = (slotName, currentDb) => {
+export const getOverlappingSlots = (slotName, currentDb) => {
   if (!currentDb || !currentDb.timeSlots) return [slotName];
   const slot = currentDb.timeSlots.find(s => s.name === slotName);
   if (!slot) return [slotName];
@@ -74,7 +74,7 @@ const getOverlappingSlots = (slotName, currentDb) => {
   }).map(s => s.name);
 };
 
-const parseIpadNumbers = (str) => {
+export const parseIpadNumbers = (str) => {
   if (!str) return [];
   let res = [];
   str.split(',').forEach(p => {
@@ -93,7 +93,7 @@ const parseIpadNumbers = (str) => {
   return Array.from(new Set(res));
 };
 
-const stringifyIpadNumbers = (arr) => {
+export const stringifyIpadNumbers = (arr) => {
   if (!arr || arr.length === 0) return "";
   arr = Array.from(new Set(arr)).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
   let res = []; 
@@ -112,7 +112,7 @@ const stringifyIpadNumbers = (arr) => {
   return res.join(', ');
 };
 
-const getUsedIpads = (date, timeSlot, cartId, excludeBookingId, currentDb) => {
+export const getUsedIpads = (date, timeSlot, cartId, excludeBookingId, currentDb) => {
   let used = []; 
   const overlappingNames = getOverlappingSlots(timeSlot, currentDb);
   currentDb.bookings.forEach(x => {
@@ -123,12 +123,12 @@ const getUsedIpads = (date, timeSlot, cartId, excludeBookingId, currentDb) => {
   return used;
 };
 
-const checkIsHoliday = (dateStr, currentDb) => {
+export const checkIsHoliday = (dateStr, currentDb) => {
   if (!currentDb || !currentDb.holidays) return null;
   return currentDb.holidays.find(h => dateStr >= h.startDate && dateStr <= h.endDate);
 };
 
-const getNormalMinDate = (currentDb) => {
+export const getNormalMinDate = (currentDb) => {
   let cur = DateUtils.today(); let count = 0;
   while (count < 2) {
     cur.setDate(cur.getDate() + 1);
@@ -137,7 +137,7 @@ const getNormalMinDate = (currentDb) => {
   return DateUtils.toISODate(cur);
 };
 
-const calculateMaxDate = (currentDb) => {
+export const calculateMaxDate = (currentDb) => {
   let cur = DateUtils.today(); let count = 0;
   while (count < 30) {
     cur.setDate(cur.getDate() + 1);
@@ -154,7 +154,7 @@ const normalizeAuthCode = (code) => {
   return normalized.replace(new RegExp('[^A-Za-z0-9]', 'g'), '').toUpperCase();
 };
 
-const defaultDB = {
+export const defaultDB = {
   carts: [{ id: 1, name: "充電車 B", capacity: 30, damaged: "" }],
   classes: [{ id: 1, name: "一年甲班", limit: 30 }],
   timeSlots: [{ id: 1, name: "第一節", timeRange: "08:40 - 09:20", quota: 2, remark: "", showRemark: false, applicableDays: [1, 2, 3, 4, 5, 6, 0] }],
