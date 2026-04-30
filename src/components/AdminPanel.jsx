@@ -1,15 +1,12 @@
 import React, { useState, useRef } from 'react';
-import * as XLSX from 'xlsx'; // 因為有 exportExcel，必須匯入 XLSX
-import { 
-  Settings, LogOut, CheckCircle, XCircle, Info, ShieldAlert, Trash2, Clock, Smartphone 
-} from 'lucide-react'; // 將後台有用到的 Icon 都放進來
+import * as XLSX from 'xlsx'; 
+import { Settings, LogOut, CheckCircle, XCircle, Info, ShieldAlert, Trash2, Clock, Smartphone } from 'lucide-react';
 
 // ==========================================
 // ⚙️ 全域設定與工具函式 (AdminPanel 需要用到的部分)
 // ==========================================
 const quoteChar = String.fromCharCode(34);
 const doubleQuote = quoteChar + quoteChar;
-
 const dayMap = { 0: '日', 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六' };
 
 const DateUtils = {
@@ -20,6 +17,7 @@ const DateUtils = {
     return d.toISOString().split('T')[0];
   },
   toChineseDate: (dateStr) => {
+    if(!dateStr) return "";
     const d = new Date(dateStr);
     return d.getFullYear() + "年 " + (d.getMonth() + 1) + "月 " + d.getDate() + "日 (星期" + dayMap[d.getDay()] + ")";
   }
