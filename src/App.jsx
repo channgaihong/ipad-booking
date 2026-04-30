@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, lazy } from 'react';
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense, startTransition } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
@@ -513,12 +513,14 @@ const api = {
             <div className="flex w-full sm:w-auto justify-between sm:justify-end space-x-2 sm:space-x-4 items-center">
               <button onClick={() => setActivePage('schedule')} className={`flex-1 sm:flex-none whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activePage === 'schedule' ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>時間表</button>
               <button onClick={() => setActivePage('booking')} className={`flex-1 sm:flex-none justify-center whitespace-nowrap px-5 py-2 sm:py-2.5 rounded-xl text-sm font-bold shadow-md transition-transform transform hover:-translate-y-0.5 flex items-center gap-2 ${activePage === 'booking' ? 'bg-sky-600 text-white ring-4 ring-sky-200' : 'bg-gradient-to-r from-sky-500 to-blue-600 text-white'}`}><ClipboardList className="w-4 h-4" /> 立即預約</button>
-              <button onClick={() => setActivePage('admin')} className={`hidden sm:block whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activePage === 'admin' ? 'bg-slate-900 text-white font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>管理後台</button>
+              <button onClick={() => {
+                startTransition(() => {
+                    setActivePage('admin');});}} className={`hidden sm:block whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activePage === 'admin' ? 'bg-slate-900 text-white font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>管理後台</button>
             </div>
           </div>
         </div>
       </nav>
-
+      <Suspense fallback={<div className="text-center p-10 font-bold text-sky-600">正在加載模組...</div>}>
       <main className="max-w-7xl mx-auto p-4 md:p-8 no-print">
         {activePage === 'schedule' && <SchedulePage db={db} />}
         {activePage === 'booking' && <BookingPage db={db} api={api} showAlert={showAlert} showConfirm={showConfirm} />}
@@ -528,7 +530,7 @@ const api = {
             <AdminLogin onLogin={handleAdminLogin} />
         )}
       </main>
-      
+      </Suspense>
       {/* 獨立的列印預覽層 */}
       {printData && <PrintOverlay db={db} printData={printData} onClose={() => setPrintData(null)} />}
     </div>
