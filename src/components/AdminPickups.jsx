@@ -1,3 +1,6 @@
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense, startTransition } from 'react';
+import { Cloud, Calendar as CalendarIcon, ClipboardList, Settings, LogOut, CheckCircle, XCircle, Info, ShieldAlert, Trash2, Clock, Smartphone } from 'lucide-react';
+
 export default function AdminPickups({ db, api, showAlert, showConfirm, openEdit }) {
     const [name, setName] = useState('');
     const [draggedIdx, setDraggedIdx] = useState(null);

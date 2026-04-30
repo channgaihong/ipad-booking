@@ -1,3 +1,6 @@
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense, startTransition } from 'react';
+import { Cloud, Calendar as CalendarIcon, ClipboardList, Settings, LogOut, CheckCircle, XCircle, Info, ShieldAlert, Trash2, Clock, Smartphone } from 'lucide-react';
+
 export default function AdminDisplay({ db, api, showAlert }) {
     const ds = db.displaySettings || { teacher: true, className: true, observation: true, ipadNumbers: true, pickupMethod: false, itSupport: false, remarks: false };
     const order = db.displayOrder || DEFAULT_DISPLAY_ORDER;
