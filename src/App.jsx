@@ -594,5 +594,5 @@ function BookingPage({ db, api, showAlert, showConfirm }) {
   );
 }
 
-
+export default App;
 
