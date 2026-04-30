@@ -20,7 +20,7 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-const API_URL = import.meta.env.VITE_GAS_API_URL;
+const API_URL = import.meta.env.VITE_API_URL;
 
 // 初始化 Firebase
 const app = initializeApp(firebaseConfig);
@@ -32,8 +32,8 @@ const dayMap = { 0: '日', 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: 
 const DEFAULT_DISPLAY_ORDER = ['observation', 'teacher', 'className', 'pickupMethod', 'itSupport', 'ipadNumbers', 'remarks'];
 
 // 使用 lazy 動態載入我們剛建立的組件
-//const AdminPanel = lazy(() => import('./components/AdminPanel'));
-import AdminPanel from './components/AdminPanel';
+const AdminPanel = lazy(() => import('./components/AdminPanel'));
+const AdminLogin = lazy(() => import('./components/AdminLogin'));
 
 const DateUtils = {
   today: () => new Date(),
@@ -301,7 +301,7 @@ const api = {
         }
         
         tasks.push(
-          fetch(GAS_API_URL, {
+          fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action: 'addBookings', payload: newBookings, usedCodes: usedCodesPayload })
@@ -338,7 +338,7 @@ const api = {
         }
         
         tasks.push(
-          fetch(GAS_API_URL, {
+          fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action: 'cancelBooking', bookingId: bookingId })
@@ -365,7 +365,7 @@ const api = {
         }
         
         tasks.push(
-          fetch(GAS_API_URL, {
+          fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action: 'adminSaveSettings', payload: newDbConfig, auth: { username: loggedAdmin, passwordHash: loggedAdminHash } })
@@ -398,7 +398,7 @@ const api = {
         }
         
         tasks.push(
-          fetch(GAS_API_URL, {
+          fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action: 'adminUpdateBookings', payload: updatedBookingsArray, auth: { username: loggedAdmin, passwordHash: loggedAdminHash } })
@@ -425,7 +425,7 @@ const api = {
         }
         
         tasks.push(
-          fetch(GAS_API_URL, {
+          fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action: 'overwriteAll', payload: newDbConfig, auth: { username: loggedAdmin, passwordHash: loggedAdminHash } })
