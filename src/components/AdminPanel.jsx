@@ -28,7 +28,7 @@ const DateUtils = {
 // ==========================================
 // ⚙️ 頁面 4：管理後台 (AdminPanel) 包含左右選單
 // ==========================================
-function AdminPanel({ db, api, subPage, setSubPage, onLogout, showAlert, showConfirm, setPrintData }) {
+export default function AdminPanel({ db, api, subPage, setSubPage, onLogout, showAlert, showConfirm, setPrintData }) {
   const [editModal, setEditModal] = useState({ show: false, type: null, index: null, data: null });
   const fileInputRef = useRef(null);
 
