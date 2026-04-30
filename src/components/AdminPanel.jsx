@@ -5,9 +5,12 @@ import { Settings, LogOut, CheckCircle, XCircle, Info, ShieldAlert, Trash2, Cloc
 // ==========================================
 // ⚙️ 全域設定與工具函式 (AdminPanel 需要用到的部分)
 // ==========================================
+const slashChar = String.fromCharCode(47);
 const quoteChar = String.fromCharCode(34);
 const doubleQuote = quoteChar + quoteChar;
 const dayMap = { 0: '日', 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六' };
+
+const DEFAULT_DISPLAY_ORDER = ['observation', 'teacher', 'className', 'pickupMethod', 'itSupport', 'ipadNumbers', 'remarks'];
 
 const DateUtils = {
   today: () => new Date(),
