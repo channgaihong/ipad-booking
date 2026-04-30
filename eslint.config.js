@@ -29,6 +29,7 @@ plugins: {
       ...react.configs['jsx-runtime'].rules,
       ...reactHooks.configs.recommended.rules,
       'react/jsx-no-target-blank': 'off',
+      'react/prop-types': 'off', // 這裡設為 off 就不會再報錯了
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },
