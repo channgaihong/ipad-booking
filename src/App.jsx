@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useRef, lazy } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
-import * as XLSX from 'xlsx';
 import { Cloud, Calendar as CalendarIcon, ClipboardList, Settings, LogOut, CheckCircle, XCircle, Info, ShieldAlert, Trash2, Clock, Smartphone } from 'lucide-react';
 
 // ==========================================
@@ -21,7 +20,7 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-const GAS_API_URL = import.meta.env.VITE_GAS_API_URL;
+const API_URL = import.meta.env.VITE_GAS_API_URL;
 
 // 初始化 Firebase
 const app = initializeApp(firebaseConfig);
