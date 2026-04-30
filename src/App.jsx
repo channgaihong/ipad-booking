@@ -32,7 +32,8 @@ const dayMap = { 0: '日', 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: 
 const DEFAULT_DISPLAY_ORDER = ['observation', 'teacher', 'className', 'pickupMethod', 'itSupport', 'ipadNumbers', 'remarks'];
 
 // 使用 lazy 動態載入我們剛建立的組件
-const AdminPanel = lazy(() => import('./components/AdminPanel'));
+//const AdminPanel = lazy(() => import('./components/AdminPanel'));
+import AdminPanel from './components/AdminPanel';
 
 const DateUtils = {
   today: () => new Date(),
