@@ -391,7 +391,7 @@ export default function AdminPanel({ db, api, subPage, setSubPage, onLogout, sho
 // 後台各子頁面組件
 // ------------------------------------------
 
-export default function AdminAssign({ db, api, showAlert, showConfirm, setPrintData, openEdit }) {
+function AdminAssign({ db, api, showAlert, showConfirm, setPrintData, openEdit }) {
     const [printDate, setPrintDate] = useState(DateUtils.toISODate(DateUtils.today()));
     const [filterDate, setFilterDate] = useState(DateUtils.toISODate(DateUtils.today()));
     const [selectedCartsForPrint, setSelectedCarts] = useState([]);
@@ -657,7 +657,7 @@ export default function AdminAssign({ db, api, showAlert, showConfirm, setPrintD
     );
 }
 
-export default function AdminDisplay({ db, api, showAlert }) {
+function AdminDisplay({ db, api, showAlert }) {
     const ds = db.displaySettings || { teacher: true, className: true, observation: true, ipadNumbers: true, pickupMethod: false, itSupport: false, remarks: false };
     const order = db.displayOrder || DEFAULT_DISPLAY_ORDER;
     const [localDs, setLocalDs] = useState(ds);
