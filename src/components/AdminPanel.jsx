@@ -2,6 +2,16 @@ import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx'; 
 import { Settings, LogOut, CheckCircle, XCircle, Info, ShieldAlert, Trash2, Clock, Smartphone } from 'lucide-react';
 
+import AdminAssign from './AdminAssign';
+import AdminDisplay from './AdminDisplay';
+import AdminTimeSlots from './AdminTimeSlots';
+import AdminClasses from './AdminClasses';
+import AdminCarts from './AdminCarts';
+import AdminPickups from './AdminPickups';
+import AdminCodes from './AdminCodes';
+import AdminHolidays from './AdminHolidays';
+import AdminAdmins from './AdminAdmins';
+
 // ==========================================
 // ⚙️ 全域設定與工具函式 (AdminPanel 需要用到的部分)
 // ==========================================

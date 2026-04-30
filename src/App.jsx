@@ -34,16 +34,6 @@ const DEFAULT_DISPLAY_ORDER = ['observation', 'teacher', 'className', 'pickupMet
 // 使用 lazy 動態載入我們剛建立的組件
 const AdminPanel = lazy(() => import('./components/AdminPanel'));
 const AdminLogin = lazy(() => import('./components/AdminLogin'));
-const AdminDisplay = lazy(() => import('./components/AdminDisplay'));
-const AdminTimeSlots = lazy(() => import('./components/AdminTimeSlots'));
-const AdminClasses = lazy(() => import('./components/AdminClasses'));
-const AdminCarts = lazy(() => import('./components/AdminCarts'));
-const AdminPickups = lazy(() => import('./components/AdminPickups'));
-const AdminHolidays = lazy(() => import('./components/AdminHolidays'));
-const AdminCodes = lazy(() => import('./components/AdminCodes'));
-const AdminAdmins = lazy(() => import('./components/AdminAdmins'));
-
-
 
 
 const DateUtils = {
