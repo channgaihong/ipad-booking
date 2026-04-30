@@ -3,7 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { Cloud, Calendar as CalendarIcon, ClipboardList, Settings, LogOut, CheckCircle, XCircle, Info, ShieldAlert, Trash2, Clock, Smartphone } from 'lucide-react';
-import { DateUtils, dayMap, DEFAULT_DISPLAY_ORDER, hashPassword, API_URL, defaultDB } from '../utils';
+import { DateUtils, dayMap, DEFAULT_DISPLAY_ORDER, hashPassword, API_URL, defaultDB } from 'src/utils';
 
 // 使用 lazy 動態載入我們剛建立的組件
 const AdminPanel = lazy(() => import('./components/AdminPanel'));
