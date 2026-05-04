@@ -65,7 +65,7 @@ export const parseTimeRange = (rangeStr) => {
   return null;
 };
 
-const checkOverlap = (r1, r2) => r1 && r2 && (r1.start < r2.end && r2.start < r1.end);
+export const checkOverlap = (r1, r2) => r1 && r2 && (r1.start < r2.end && r2.start < r1.end);
 
 export const getOverlappingSlots = (slotName, currentDb) => {
   if (!currentDb || !currentDb.timeSlots) return [slotName];
