@@ -1,3 +1,7 @@
+
+import React, { useState } from 'react';
+import { Cloud, Calendar as CalendarIcon, ClipboardList, Settings, LogOut, CheckCircle, XCircle, Info, ShieldAlert, Trash2, Clock, Smartphone } from 'lucide-react';
+
 export default function AdminClasses({ db, api, showAlert, showConfirm, openEdit }) {
     const [name, setName] = useState(''); const [limit, setLimit] = useState(30);
     const [draggedIdx, setDraggedIdx] = useState(null);

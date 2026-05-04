@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx'; 
-import { Settings, LogOut, CheckCircle, XCircle, Info, ShieldAlert, Trash2, Clock, Smartphone } from 'lucide-react';
+import { Settings, LogOut, CheckCircle, XCircle, Info, ShieldAlert, Trash2, Clock, Smartphone, ClipboardList } from 'lucide-react';
+import { defaultDB, hashPassword, parseIpadNumbers, getUsedIpads, stringifyIpadNumbers,slashChar,quoteChar,doubleQuote,dayMap, DEFAULT_DISPLAY_ORDER, DateUtils } from './utils.jsx';
 
 import AdminAssign from './AdminAssign';
 import AdminDisplay from './AdminDisplay';
@@ -15,26 +16,14 @@ import AdminAdmins from './AdminAdmins';
 // ==========================================
 // ⚙️ 全域設定與工具函式 (AdminPanel 需要用到的部分)
 // ==========================================
-const slashChar = String.fromCharCode(47);
-const quoteChar = String.fromCharCode(34);
-const doubleQuote = quoteChar + quoteChar;
-const dayMap = { 0: '日', 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六' };
+//const slashChar = String.fromCharCode(47);
+//const quoteChar = String.fromCharCode(34);
+//const doubleQuote = quoteChar + quoteChar;
+//const dayMap = { 0: '日', 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六' };
 
-const DEFAULT_DISPLAY_ORDER = ['observation', 'teacher', 'className', 'pickupMethod', 'itSupport', 'ipadNumbers', 'remarks'];
+//const DEFAULT_DISPLAY_ORDER = ['observation', 'teacher', 'className', 'pickupMethod', 'itSupport', 'ipadNumbers', 'remarks'];
 
-const DateUtils = {
-  today: () => new Date(),
-  toISODate: (date) => {
-    const d = new Date(date);
-    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-    return d.toISOString().split('T')[0];
-  },
-  toChineseDate: (dateStr) => {
-    if(!dateStr) return "";
-    const d = new Date(dateStr);
-    return d.getFullYear() + "年 " + (d.getMonth() + 1) + "月 " + d.getDate() + "日 (星期" + dayMap[d.getDay()] + ")";
-  }
-};
+
 
 // ==========================================
 // ⚙️ 頁面 4：管理後台 (AdminPanel) 包含左右選單
