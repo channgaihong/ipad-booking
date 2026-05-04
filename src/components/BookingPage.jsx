@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 // 👇 請補上這一行，把用到的圖示全部請進來
 import { ClipboardList, ShieldAlert, CheckCircle, XCircle, Info, Calendar as CalendarIcon, Clock } from 'lucide-react';
 // 👇 您原本的 utils 引入
-import { DateUtils, getNormalMinDate, calculateMaxDate, checkIsHoliday, getOverlappingSlots, normalizeAuthCode } from './utils.jsx';
+import { DateUtils, getNormalMinDate, calculateMaxDate, checkIsHoliday, getOverlappingSlots, normalizeAuthCode, dayMap } from './utils.jsx';
 // ==========================================
 // 📝 頁面 2：預約登記 (BookingPage)
 // ==========================================
