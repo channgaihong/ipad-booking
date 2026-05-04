@@ -22,7 +22,7 @@ export const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-export const API_URL = import.meta.env.VITE_API_URL;
+export const API_URL = import.meta.env.VITE_GAS_API_URL;
 
 // 初始化 Firebase
 export const app = initializeApp(firebaseConfig);
