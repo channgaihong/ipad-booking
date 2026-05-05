@@ -385,10 +385,12 @@ const api = {
             <AdminLogin onLogin={handleAdminLogin} />
         )}
       </main>
-      
-      {/* 獨立的列印預覽層 */}
-      {printData && <PrintOverlay db={db} printData={printData} onClose={() => setPrintData(null)} />}
       </Suspense>
+      {/* 獨立的列印預覽層 */}
+      <Suspense fallback={<div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/50 text-white font-bold">載入列印模組中...</div>}>
+        {printData && <PrintOverlay db={db} printData={printData} onClose={() => setPrintData(null)} />}
+      </Suspense>
+      
     </div>
   );
 }
