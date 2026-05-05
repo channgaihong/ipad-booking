@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense, startTransition } from 'react';
-import { initializeApp } from 'firebase/app';
+//import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { Cloud, Calendar as CalendarIcon, ClipboardList, Settings, LogOut, CheckCircle, XCircle, Info, ShieldAlert, Trash2, Clock, Smartphone } from 'lucide-react';
-import { DateUtils, dayMap, DEFAULT_DISPLAY_ORDER, hashPassword, API_URL, defaultDB } from "./components/utils.jsx";;
+// 加入 slashChar
+import { DateUtils, dayMap, DEFAULT_DISPLAY_ORDER, hashPassword, API_URL, defaultDB, slashChar, db_firestore, app } from "./components/utils.jsx";
 
 // 使用 lazy 動態載入我們剛建立的組件
 //const AdminPanel = lazy(() => import('./components/AdminPanel'));
@@ -21,9 +22,12 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState('schedule');
   const [adminSubPage, setAdminSubPage] = useState('assign');
-  const [loggedAdmin, setLoggedAdmin] = useState(sessionStorage.getItem('loggedAdmin') || null);
-  const [loggedAdminHash, setLoggedAdminHash] = useState(sessionStorage.getItem('loggedAdminHash') || null);
-  
+  const [loggedAdmin, setLoggedAdmin] = useState('admin'); // 強制設定為 admin
+  const [loggedAdminHash, setLoggedAdminHash] = useState('admin123'); // 隨便塞一個字串
+  //const [loggedAdmin, setLoggedAdmin] = useState(sessionStorage.getItem('loggedAdmin') || null);
+  //const [loggedAdminHash, setLoggedAdminHash] = useState(sessionStorage.getItem('loggedAdminHash') || null);
+
+
   const [alertConfig, setAlertConfig] = useState({ show: false, msg: '', title: '', icon: 'ℹ️', type: 'alert', onConfirm: null, onCancel: null });
   const [printData, setPrintData] = useState(null);
 
@@ -54,10 +58,10 @@ export default function App() {
         const configStr = typeof window.__firebase_config !== 'undefined' ? window.__firebase_config : '{}';
         const config = JSON.parse(configStr);
         if (Object.keys(config).length > 0) {
-          const app = initializeApp(config);
+          //const app = initializeApp(config);
           const auth = getAuth(app);
-          const fs = getFirestore(app);
-          setFirestoreInstance(fs);
+          //const fs = getFirestore(app);
+          setFirestoreInstance(db_firestore);
 
           if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
             await signInWithCustomToken(auth, window.__initial_auth_token);
@@ -69,7 +73,7 @@ export default function App() {
             if (user) {
               setIsFirebaseReady(true);
               const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
-              const docRef = doc(fs, 'artifacts', appId, 'public', 'data', 'ipad_db', 'global_state');
+              const docRef = doc( db_firestore, 'artifacts', appId, 'public', 'data', 'ipad_db', 'global_state');
               
               onSnapshot(docRef, (snapshot) => {
                 if (snapshot.exists()) {
@@ -346,16 +350,27 @@ const api = {
                 <Cloud className="w-8 h-8 text-sky-500 mr-2" />
                 <span className="text-xl font-bold text-slate-900">iPad 預約系統</span>
               </div>
-              <button onClick={() => setActivePage('admin')} className={`sm:hidden p-2 rounded-lg transition-colors ${activePage === 'admin' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'}`}>
+              <button onClick={() => {startTransition(() => {
+                setActivePage('admin');
+              })
+              }} className={`sm:hidden p-2 rounded-lg transition-colors ${activePage === 'admin' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'}`}>
                 <Settings className="w-5 h-5" />
               </button>
             </div>
             <div className="flex w-full sm:w-auto justify-between sm:justify-end space-x-2 sm:space-x-4 items-center">
-              <button onClick={() => setActivePage('schedule')} className={`flex-1 sm:flex-none whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activePage === 'schedule' ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>時間表</button>
-              <button onClick={() => setActivePage('booking')} className={`flex-1 sm:flex-none justify-center whitespace-nowrap px-5 py-2 sm:py-2.5 rounded-xl text-sm font-bold shadow-md transition-transform transform hover:-translate-y-0.5 flex items-center gap-2 ${activePage === 'booking' ? 'bg-sky-600 text-white ring-4 ring-sky-200' : 'bg-gradient-to-r from-sky-500 to-blue-600 text-white'}`}><ClipboardList className="w-4 h-4" /> 立即預約</button>
+              <button onClick={() => {startTransition(() => {
+                setActivePage('schedule');
+              })
+              }}className={`flex-1 sm:flex-none whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activePage === 'schedule' ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>時間表</button>
+              <button onClick={() => {startTransition(() => {
+                  setActivePage('booking');
+                })
+              }}className={`flex-1 sm:flex-none justify-center whitespace-nowrap px-5 py-2 sm:py-2.5 rounded-xl text-sm font-bold shadow-md transition-transform transform hover:-translate-y-0.5 flex items-center gap-2 ${activePage === 'booking' ? 'bg-sky-600 text-white ring-4 ring-sky-200' : 'bg-gradient-to-r from-sky-500 to-blue-600 text-white'}`}><ClipboardList className="w-4 h-4" /> 立即預約</button>
               <button onClick={() => {
                 startTransition(() => {
-                    setActivePage('admin');});}} className={`hidden sm:block whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activePage === 'admin' ? 'bg-slate-900 text-white font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>管理後台</button>
+                    setActivePage('admin');
+                  })
+                }} className={`hidden sm:block whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activePage === 'admin' ? 'bg-slate-900 text-white font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>管理後台</button>
             </div>
           </div>
         </div>
@@ -370,9 +385,10 @@ const api = {
             <AdminLogin onLogin={handleAdminLogin} />
         )}
       </main>
-      </Suspense>
+      
       {/* 獨立的列印預覽層 */}
       {printData && <PrintOverlay db={db} printData={printData} onClose={() => setPrintData(null)} />}
+      </Suspense>
     </div>
   );
 }
