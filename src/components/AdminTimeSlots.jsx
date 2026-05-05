@@ -32,7 +32,7 @@ export default function AdminTimeSlots({ db, api, showAlert, showConfirm, openEd
 
         const item = arr.splice(oldIndex, 1)[0];
         arr.splice(newIndex, 0, item);
-        try { await api.adminSaveSettings({ ...db, timeSlots: arr }); } catch(e){}
+        try { await api.adminSaveSettings({ ...db, timeSlots: arr }); } catch(e) {}
     };
 
     return (

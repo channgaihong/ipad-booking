@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CalendarIcon } from 'lucide-react';
-import { DateUtils, DEFAULT_DISPLAY_ORDER } from './utils'; 
+import { DateUtils, dayMap, slashChar, DEFAULT_DISPLAY_ORDER, API_URL, defaultDB } from './utils.jsx';
+
 // ==========================================
 // 🖨️ 獨立列印預覽層 (PrintOverlay) - A5 精準無白頁限制
 // ==========================================
