@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense, startTransition } from 'react';
 import { Cloud, Calendar as CalendarIcon, ClipboardList, Settings, LogOut, CheckCircle, XCircle, Info, ShieldAlert, Trash2, Clock, Smartphone } from 'lucide-react';
+import { defaultDB, hashPassword, parseIpadNumbers, getUsedIpads, stringifyIpadNumbers, slashChar, quoteChar, doubleQuote, dayMap, DEFAULT_DISPLAY_ORDER, DateUtils } from './utils.jsx';
 
 export default function AdminTimeSlots({ db, api, showAlert, showConfirm, openEdit }) {
     const [name, setName] = useState(''); const [time, setTime] = useState(''); const [quota, setQuota] = useState(''); const [remark, setRemark] = useState(''); const [showRmk, setShowRmk] = useState(true); const [days, setDays] = useState([1,2,3,4,5,6,0]);
