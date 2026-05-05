@@ -42,7 +42,7 @@ export const DateUtils = {
   toChineseDate: (dateStr) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
-    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+    return d.getFullYear() + "年 " + (d.getMonth() + 1) + "月 " + d.getDate() + "日 (星期" + dayMap[d.getDay()] + ")";
   }
 };
 
