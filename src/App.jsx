@@ -22,10 +22,10 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState('schedule');
   const [adminSubPage, setAdminSubPage] = useState('assign');
-  const [loggedAdmin, setLoggedAdmin] = useState('admin'); // 強制設定為 admin
-  const [loggedAdminHash, setLoggedAdminHash] = useState('admin123'); // 隨便塞一個字串
-  //const [loggedAdmin, setLoggedAdmin] = useState(sessionStorage.getItem('loggedAdmin') || null);
-  //const [loggedAdminHash, setLoggedAdminHash] = useState(sessionStorage.getItem('loggedAdminHash') || null);
+  //const [loggedAdmin, setLoggedAdmin] = useState('admin'); // 強制設定為 admin
+  //const [loggedAdminHash, setLoggedAdminHash] = useState('1234'); // 隨便塞一個字串
+  const [loggedAdmin, setLoggedAdmin] = useState(sessionStorage.getItem('loggedAdmin') || null);
+  const [loggedAdminHash, setLoggedAdminHash] = useState(sessionStorage.getItem('loggedAdminHash') || null);
 
 
   const [alertConfig, setAlertConfig] = useState({ show: false, msg: '', title: '', icon: 'ℹ️', type: 'alert', onConfirm: null, onCancel: null });
