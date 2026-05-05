@@ -23,7 +23,7 @@ export default function App() {
   const [activePage, setActivePage] = useState('schedule');
   const [adminSubPage, setAdminSubPage] = useState('assign');
   //const [loggedAdmin, setLoggedAdmin] = useState('admin'); // 強制設定為 admin
-  //const [loggedAdminHash, setLoggedAdminHash] = useState('1234'); // 隨便塞一個字串
+  //const [loggedAdminHash, setLoggedAdminHash] = useState('admin123'); // 隨便塞一個字串
   const [loggedAdmin, setLoggedAdmin] = useState(sessionStorage.getItem('loggedAdmin') || null);
   const [loggedAdminHash, setLoggedAdminHash] = useState(sessionStorage.getItem('loggedAdminHash') || null);
 
@@ -300,9 +300,13 @@ const api = {
       });
       const data = await res.json();
       if (data.status === 'success') {
-        setLoggedAdmin(u); setLoggedAdminHash(hashedPwd);
-        sessionStorage.setItem('loggedAdmin', u); sessionStorage.setItem('loggedAdminHash', hashedPwd);
-        setAdminSubPage('assign');
+        sessionStorage.setItem('loggedAdmin', u); 
+        sessionStorage.setItem('loggedAdminHash', hashedPwd);
+        startTransition(() => {
+          setLoggedAdmin(u); 
+          setLoggedAdminHash(hashedPwd);
+          setAdminSubPage('assign');
+        });
       } else { 
         showAlert('登入失敗：' + data.message, "錯誤", "❌"); 
       }
@@ -381,7 +385,14 @@ const api = {
         {activePage === 'booking' && <BookingPage db={db} api={api} showAlert={showAlert} showConfirm={showConfirm} />}
         {activePage === 'admin' && (
           loggedAdmin ? 
-            <AdminPanel db={db} api={api} subPage={adminSubPage} setSubPage={setAdminSubPage} onLogout={() => {setLoggedAdmin(null); setLoggedAdminHash(null); sessionStorage.clear();}} showAlert={showAlert} showConfirm={showConfirm} setPrintData={setPrintData} /> : 
+            <AdminPanel db={db} api={api} subPage={adminSubPage} setSubPage={setAdminSubPage} 
+            onLogout={() => {
+              sessionStorage.clear();
+              startTransition(() => {
+                setLoggedAdmin(null); 
+                setLoggedAdminHash(null); 
+              });
+}} showAlert={showAlert} showConfirm={showConfirm} setPrintData={setPrintData} /> : 
             <AdminLogin onLogin={handleAdminLogin} />
         )}
       </main>
@@ -390,7 +401,6 @@ const api = {
       <Suspense fallback={<div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/50 text-white font-bold">載入列印模組中...</div>}>
         {printData && <PrintOverlay db={db} printData={printData} onClose={() => setPrintData(null)} />}
       </Suspense>
-      
     </div>
   );
 }
